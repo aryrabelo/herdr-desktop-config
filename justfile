@@ -10,7 +10,8 @@ update:
 dry-run:
     bash install.sh --dry-run
 
-# Testa os mods (lógica pura) e o herdr-lane + links globais do install.sh (com mutantes)
+# Testa os mods (lógica pura), o herdr-lane + links globais (com mutantes) e o install.sh numa config falsa
 test:
     node test/mods-test.mjs
     bash test/herdr-lane-test.sh
+    bash test/install-smoke.sh

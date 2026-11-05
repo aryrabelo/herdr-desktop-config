@@ -51,7 +51,13 @@ for m in "${MODS[@]}"; do TARGETS+=("mods/$m"); done
 for t in "${TARGETS[@]}"; do
   if [ -e "$DEST/$t" ] || [ -L "$DEST/$t" ]; then
     run mkdir -p "$(dirname "$BACKUP/$t")"
-    run cp -RL "$DEST/$t" "$BACKUP/$t"
+    # Symlink quebrado (geração velha do home-manager) faz o -L falhar: guarda o link em si.
+    if [ "$DRY" = 1 ]; then run cp -RL "$DEST/$t" "$BACKUP/$t"
+    elif ! cp -RL "$DEST/$t" "$BACKUP/$t" 2>/dev/null; then
+      rm -rf "$BACKUP/$t"
+      cp -RP "$DEST/$t" "$BACKUP/$t"
+      echo "aviso: $t tem symlink quebrado; backup guardou os links" >&2
+    fi
   fi
 done
 
