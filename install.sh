@@ -11,7 +11,9 @@
 #
 # Origem dos mods (copiados de mods/, nunca symlink):
 #   next-needed    deste repo
-#   space-folders  jankeesvw/herdr-space-folders @ 63a78b20d5ed30d57166a3c7165a6eb558c3ef84 (MIT, sem alteração)
+#   pane-head      deste repo (clone do `pane` do Herdr 0.1.13 + nome e endereço do agente)
+#   space-folders  jankeesvw/herdr-space-folders @ 63a78b20d5ed30d57166a3c7165a6eb558c3ef84 (MIT),
+#                  com um patch daqui: estado do PR da branch (gh pr view) na linha do space
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,7 +40,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="$DEST/backup-$STAMP"
 
 # 1. Backup do que vai ser sobrescrito. -L copia o conteúdo de symlinks.
-MODS=(next-needed space-folders)
+MODS=(next-needed pane-head space-folders)
 TARGETS=(keys.json settings.json layouts/ary.json layouts/main-folders.json)
 for m in "${MODS[@]}"; do TARGETS+=("mods/$m"); done
 for t in "${TARGETS[@]}"; do

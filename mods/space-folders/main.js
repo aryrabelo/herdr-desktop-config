@@ -133,6 +133,27 @@ const base = (path) => path.replace(/\/+$/, "").split("/").pop();
 // for this often, in repos the list shows, while the window is in front.
 const FALLBACK = 60000;
 
+// The PR of a branch (patch of herdr-desktop-config): one per repo and branch.
+const prKey = (g) => `${g.repo}|${g.branch}`;
+// gh's statusCheckRollup as one word: a red check wins, then one still running.
+export function rollup(list) {
+  const bad = ["FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"];
+  const word = (c) => c.conclusion || c.state || c.status || "";
+  if (list.some((c) => bad.includes(word(c)))) return "failure";
+  if (list.some((c) => (c.status && c.status !== "COMPLETED") || ["PENDING", "EXPECTED"].includes(c.state))) return "pending";
+  return list.length ? "success" : "none";
+}
+// Color like GitHub: merged purple, closed red, draft dim; an open PR by its checks.
+export function prTone(t, p) {
+  if (!p) return null;
+  if (p.state === "MERGED") return t.ansi5;
+  if (p.state === "CLOSED") return t.ansi1;
+  if (p.draft) return t.dim;
+  return { failure: t.ansi1, pending: t.ansi3, success: t.ansi2 }[p.checks] ?? t.foreground;
+}
+export const prGlyph = (p) => p.state === "MERGED" ? "\u2713" : p.state === "CLOSED" ? "\u00d7" : p.draft ? "\u25cc"
+  : { failure: "\u2717", pending: "\u25cf", success: "\u2713" }[p.checks] ?? "\u25cb";
+
 // What a stored color name looks like on an avatar (the same in every mod
 // that draws space avatars): one strong color per hue, light and dark alike.
 const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
@@ -185,6 +206,8 @@ export default class Spaces extends View {
     this.moving = null; // a folder being dragged: { machine, id, index }
     this.overMove = null;
     this.git = {}; // where() -> { name, branch, ahead, behind, repo, linked }, null: not a repo
+    this.pr = {}; // repo|branch -> { n, state, draft, checks, at } (null: no PR), from `gh pr view`
+    this.prQueue = new Map(); // repo|branch -> { cwd, on } to ask gh about next
     this.checked = {}; // where() -> when it was last looked at
     this.unsure = new Set(); // where()s git couldn't answer for (a machine away)
     this.pending = new Set(); // where()s to look at next
@@ -246,6 +269,7 @@ export default class Spaces extends View {
     this.join(sp, now, this.adopt(sp, now));
     const due = this.due(now, sp, panes());
     if (due.size) this.refreshGit(due, cx);
+    this.duePr(now, cx);
     if (sp.some((s) => !this.shown.has(s.id))) cx.notify();
   }
 
@@ -311,6 +335,40 @@ export default class Spaces extends View {
       for (const repo of this.watching) if (!used.has(repo)) this.watching.delete(repo);
       this.refreshing = false;
       cx.notify();
+    });
+  }
+
+  // The branch's PR, from `gh pr view` in a place on it. Asked again by what it
+  // was: checks running every minute, open every 3, none every 5, merged or
+  // closed every 30; only while the window is in front, one call at a time.
+  duePr(now, cx) {
+    if (!window().active && Object.keys(this.pr).length) return;
+    for (const [k, g] of Object.entries(this.git)) {
+      if (!g?.branch || g.branch === "main" || g.branch === "master") continue;
+      const id = prKey(g);
+      const p = this.pr[id];
+      const ttl = p === undefined ? (this.prAt?.[id] ? 300000 : 0) : p === null ? 300000 : p.state !== "OPEN" ? 1800000 : p.checks === "pending" ? 60000 : 180000;
+      if (now - (p?.at ?? this.prAt?.[id] ?? 0) < ttl || this.prQueue.has(id)) continue;
+      const [on, cwd] = JSON.parse(k);
+      this.prQueue.set(id, { cwd, on });
+    }
+    if (!this.prQueue.size || this.prAsking) return;
+    this.prAsking = true;
+    cx.spawn(async (cx) => {
+      while (this.prQueue.size) {
+        const [id, { cwd, on }] = this.prQueue.entries().next().value;
+        this.prQueue.delete(id);
+        (this.prAt ??= {})[id] = Date.now();
+        try {
+          const r = await exec("sh", ["-c", 'PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; exec gh pr view --json number,state,isDraft,statusCheckRollup'], { cwd, on });
+          if (r.code === 0) {
+            const j = JSON.parse(r.stdout);
+            this.pr[id] = { n: j.number, state: j.state, draft: j.isDraft, checks: rollup(j.statusCheckRollup ?? []), at: Date.now() };
+          } else if (/no pull requests found/i.test(r.stderr)) this.pr[id] = null;
+        } catch {}
+        cx.notify();
+      }
+      this.prAsking = false;
     });
   }
 
@@ -737,7 +795,12 @@ export default class Spaces extends View {
       .text_color(t.dim)
       .when(Boolean(where), (el) => el.child(div().min_w(0).truncate().child(where)))
       .when(g.ahead > 0, (el) => el.child(div().flex_none().text_color(t.ansi2).child(`\u2191${g.ahead}`)))
-      .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
+      .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)))
+      .when(Boolean(this.prOf(g)), (el) => { const p = this.prOf(g); return el.child(div().flex_none().text_color(prTone(t, p)).child(`${prGlyph(p)} #${p.n}`)); });
+  }
+
+  prOf(g) {
+    return g?.branch ? this.pr[prKey(g)] ?? null : null;
   }
 
   row({ w, i, g, tree, folder, nested }, t) {
@@ -790,7 +853,7 @@ export default class Spaces extends View {
         h_flex()
           .gap(9)
           .items_center()
-          .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
+          .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(prTone(t, this.prOf(g)) ?? t.dim)))
           .when(!tree, el => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?")))
           .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(w.name))
           .child(g ? this.gitTail(g, tree, w.name, t) : div().flex_1()),

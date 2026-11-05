@@ -10,12 +10,33 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 |---|---|---|
 | atalhos | `config/keys.json` | atalhos globais, de terminal e uma seção só do layout `main-folders` |
 | settings | `config/settings.json` | zoom 0.9, tema escuro, sons ligados |
-| layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar padrão (spaces + agents) |
+| layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar padrão (spaces + agents) e o cabeçalho `pane-head` em cada pane |
 | layout `main-folders` | `config/layouts/main-folders.json` | igual ao `ary`, mas a lista de spaces vira o mod `space-folders` |
 | mod `next-needed` | `mods/next-needed/` | ⌘J foca o próximo agente que precisa de você |
-| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), cópia sem alteração do commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto |
+| mod `pane-head` | `mods/pane-head/` | cabeçalho do pane (clone do `pane` do Herdr): com agente, mostra o nome dele e o endereço no hc (`t2y`), o mesmo que os agentes usam quando falam de um terminal |
+| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja abaixo) |
 | pastas automáticas | `space-folders/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
+
+### Estado do PR na linha do space
+
+Cada space numa branch que não é `main`/`master` mostra o PR dela, lido com
+`gh pr view --json number,state,isDraft,statusCheckRollup` na pasta do space:
+o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
+
+| estado | cor | sinal |
+|---|---|---|
+| merged | roxo (`ansi5`) | `✓` |
+| aberto, checks rodando | amarelo (`ansi3`) | `●` |
+| aberto, checks verdes | verde (`ansi2`) | `✓` |
+| aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
+| draft | apagado (`dim`) | `◌` |
+| fechado | vermelho | `×` |
+
+Sem PR, nada muda (ícone cinza). Cache por repo e branch, uma chamada ao `gh`
+por vez e só com a janela em frente: checks rodando a cada 1 min, aberto a cada
+3, sem PR a cada 5, merged/fechado a cada 30. O `gh` precisa estar logado na
+conta dona do repo.
 
 ## A sidebar com pastas
 
@@ -77,7 +98,7 @@ O `install.sh`:
 1. faz backup do que vai sobrescrever em `~/.config/herdr-app/backup-<data>/`;
 2. copia `keys.json`, `settings.json` e os dois layouts (apaga antes o
    destino, então um symlink do home-manager é trocado por arquivo);
-3. copia os mods `next-needed` e `space-folders` de `mods/` — **cópia, nunca
+3. copia os mods `next-needed`, `pane-head` e `space-folders` de `mods/` — **cópia, nunca
    symlink**: o Herdr não percebe mudança dentro de pasta de mod linkada;
 4. roda `herdr-app check` em cada mod.
 
@@ -202,4 +223,5 @@ Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais em
 ## Licença
 
 MIT (`LICENSE`). O `mods/space-folders/` é de Jankees van Woezik, também MIT,
-redistribuído sem alteração com o `LICENSE` original dentro da pasta.
+redistribuído com o `LICENSE` original dentro da pasta e um patch nosso (estado
+do PR), marcado no código. O `mods/pane-head/` parte do mod `pane` que vem com o Herdr.
