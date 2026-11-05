@@ -13,7 +13,7 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 | layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar padrão (spaces + agents) |
 | layout `main-folders` | `config/layouts/main-folders.json` | igual ao `ary`, mas a lista de spaces vira o mod `space-folders` |
 | mod `next-needed` | `mods/next-needed/` | ⌘J foca o próximo agente que precisa de você |
-| mod `space-folders` | clonado pelo `install.sh` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b2`. O código não está neste repo |
+| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), cópia sem alteração do commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto |
 | pastas automáticas | `space-folders/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 
 ## A sidebar com pastas
@@ -61,8 +61,8 @@ O resto está em `config/keys.json`.
 
 ## Instalar
 
-Pré-requisitos: Herdr desktop com `herdr-app` no PATH, `git` e, para as
-pastas automáticas, `jq`.
+Pré-requisitos: Herdr desktop com `herdr-app` no PATH e, para as pastas
+automáticas, `jq`. Não precisa de rede nem de `git` para instalar.
 
 ```bash
 git clone https://github.com/aryrabelo/herdr-desktop-config.git
@@ -76,12 +76,14 @@ O `install.sh`:
 1. faz backup do que vai sobrescrever em `~/.config/herdr-app/backup-<data>/`;
 2. copia `keys.json`, `settings.json` e os dois layouts (apaga antes o
    destino, então um symlink do home-manager é trocado por arquivo);
-3. copia o mod `next-needed` — **cópia, nunca symlink**: o Herdr não percebe
-   mudança dentro de pasta de mod linkada;
-4. clona o space-folders no commit `63a78b2` e copia para `mods/space-folders`;
-5. roda `herdr-app check` em cada mod.
+3. copia os mods `next-needed` e `space-folders` de `mods/` — **cópia, nunca
+   symlink**: o Herdr não percebe mudança dentro de pasta de mod linkada;
+4. roda `herdr-app check` em cada mod.
 
 Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
+
+Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
+estiver no repo (é o `install.sh`), `just dry-run` só mostra.
 
 Depois, ⌘⇧L e escolha `main-folders`.
 
@@ -143,5 +145,5 @@ pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
 
 ## Licença
 
-MIT (`LICENSE`). O space-folders é de Jankees van Woezik, também MIT, e não é
-redistribuído aqui.
+MIT (`LICENSE`). O `mods/space-folders/` é de Jankees van Woezik, também MIT,
+redistribuído sem alteração com o `LICENSE` original dentro da pasta.

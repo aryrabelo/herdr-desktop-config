@@ -2,10 +2,11 @@
 # Instala a configuração do Herdr desktop deste repo em ~/.config/herdr-app.
 #   bash install.sh            instala (com backup do que já existe)
 #   bash install.sh --dry-run  só lista o que faria
+#
+# Origem dos mods (copiados de mods/, nunca symlink):
+#   next-needed    deste repo
+#   space-folders  jankeesvw/herdr-space-folders @ 63a78b20d5ed30d57166a3c7165a6eb558c3ef84 (MIT, sem alteração)
 set -euo pipefail
-
-SPACE_FOLDERS_REPO="https://github.com/jankeesvw/herdr-space-folders.git"
-SPACE_FOLDERS_COMMIT="63a78b2"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="${HERDR_APP_DIR:-$HOME/.config/herdr-app}"
@@ -22,7 +23,6 @@ run() {
 }
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "falta o comando: $1" >&2; exit 1; }; }
-need git
 if [ "$DRY" = 0 ]; then need herdr-app; fi
 command -v herdr-app >/dev/null 2>&1 || echo "aviso: herdr-app não está no PATH (o check dos mods vai falhar fora do dry-run)"
 
@@ -30,7 +30,9 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="$DEST/backup-$STAMP"
 
 # 1. Backup do que vai ser sobrescrito. -L copia o conteúdo de symlinks.
-TARGETS=(keys.json settings.json layouts/ary.json layouts/main-folders.json mods/next-needed mods/space-folders)
+MODS=(next-needed space-folders)
+TARGETS=(keys.json settings.json layouts/ary.json layouts/main-folders.json)
+for m in "${MODS[@]}"; do TARGETS+=("mods/$m"); done
 for t in "${TARGETS[@]}"; do
   if [ -e "$DEST/$t" ] || [ -L "$DEST/$t" ]; then
     run mkdir -p "$(dirname "$BACKUP/$t")"
@@ -50,22 +52,15 @@ install_file "$REPO/config/settings.json"           "$DEST/settings.json"
 install_file "$REPO/config/layouts/ary.json"          "$DEST/layouts/ary.json"
 install_file "$REPO/config/layouts/main-folders.json" "$DEST/layouts/main-folders.json"
 
-# 3. Mods: sempre cópia, nunca symlink (o Herdr não percebe mudança dentro de pasta linkada).
-run rm -rf "$DEST/mods/next-needed"
+# 3. Mods de mods/: sempre cópia, nunca symlink (o Herdr não percebe mudança dentro de pasta linkada).
 run mkdir -p "$DEST/mods"
-run cp -R "$REPO/mods/next-needed" "$DEST/mods/next-needed"
+for m in "${MODS[@]}"; do
+  run rm -rf "$DEST/mods/$m"
+  run cp -R "$REPO/mods/$m" "$DEST/mods/$m"
+done
 
-# 4. space-folders: clona o commit fixado e copia sem o .git.
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/herdr-space-folders.XXXXXX")"
-trap 'rm -rf "$TMP"' EXIT
-run git clone --quiet "$SPACE_FOLDERS_REPO" "$TMP/src"
-run git -C "$TMP/src" checkout --quiet "$SPACE_FOLDERS_COMMIT"
-run rm -rf "$TMP/src/.git"
-run rm -rf "$DEST/mods/space-folders"
-run cp -R "$TMP/src" "$DEST/mods/space-folders"
-
-# 5. Valida cada mod.
-for m in next-needed space-folders; do
+# 4. Valida cada mod.
+for m in "${MODS[@]}"; do
   run herdr-app check "$DEST/mods/$m"
 done
 
