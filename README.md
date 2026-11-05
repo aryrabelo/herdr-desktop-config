@@ -15,6 +15,7 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 | mod `next-needed` | `mods/next-needed/` | ⌘J foca o próximo agente que precisa de você |
 | mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), cópia sem alteração do commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto |
 | pastas automáticas | `space-folders/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
+| `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
 
 ## A sidebar com pastas
 
@@ -83,7 +84,8 @@ O `install.sh`:
 Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
 
 Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
-estiver no repo (é o `install.sh`), `just dry-run` só mostra.
+estiver no repo (é o `install.sh`), `just dry-run` só mostra e `just test`
+roda o teste do `herdr-lane`.
 
 Depois, ⌘⇧L e escolha `main-folders`.
 
@@ -142,6 +144,60 @@ volta os arquivos de `~/.config/herdr-app/backup-<data>/` e apague
 O Herdr manda SIGHUP para todo processo com o `HC_TERMINAL_ID` do terminal que
 fecha, e o `open` repassa esse ambiente ao app. App GUI aberto de dentro de um
 pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
+
+## herdr-lane
+
+Uma sessão omp lê em qualquer lugar e só escreve no próprio repo (a lane, raiz
+git do cwd). Para escrever em outro repo, ela escreve um brief em
+`~/Sites/.agent-notes/YYYY-MM-DD-<lane>-to-<repo>-<slug>.md` e chama:
+
+```bash
+herdr-lane <caminho alvo> --brief-file <brief> --from <lane> [--dry-run]
+```
+
+O `herdr-lane` reaproveita um agente parado naquele repo (`hc send`) ou abre
+um space novo `<repo>·<slug>` com `herdr-app do space.new --folder <raiz>
+--argv '["omp-safe"]' --task "Leia <brief> e execute"`. Exits 0/1/2/3/4 e o
+JSON de uma linha estão no cabeçalho do script.
+
+Instalar: `just update`. Ele cria `~/.local/bin/herdr-lane`, o alias
+`~/.local/bin/bora-lane → herdr-lane` (nome antigo, por algumas semanas) e
+`~/.omp/agent/rules/herdr-lane.md`, a regra que ensina o agente a usar o
+script. Os três são symlink para este repo. Destino que não é symlink, ou
+symlink para fora do `dotfiles-2026`/nix store, é avisado e pulado. As pastas
+mudam com `HERDR_LANE_BIN_DIR` e `HERDR_LANE_RULES_DIR`.
+
+Os porquês:
+
+- **O nome do space é o assunto.** Com `--brief-file`, o slug é o nome do
+  brief sem a data e sem o `<from>-to-<repo>-` (até 48 caracteres, cortado num
+  `-`). Sem slug, ou com `--brief` em texto, vira `de-<from>`. No reuso o space
+  não é renomeado.
+- **O brief entra pelo argv (`--task`), não por colagem.** Chega ao omp como
+  mensagem do usuário, sem corrida. Um `hc send` chega como
+  `<hc from="tNN">…</hc>`, que um agente desconfiado pode tratar como relato e
+  não como ordem. Por isso `--brief` que começa com `-` é exit 2: o omp leria
+  como flag.
+- **Idle da partida.** Logo depois do `space.new` o hc diz `idle`/`turn 0` por
+  uns 2 s. Um `hc wait` nessa janela volta na hora. O `herdr-lane` só sai com
+  0 depois de ver o turno começar (`turn` sobe ou `working`); no reuso guarda o
+  `turn` de antes do send, porque o `done` do turno anterior ainda aparece.
+  Espera até `HERDR_LANE_START_S` (90 s; `BORA_LANE_START_S` ainda vale).
+- **Principal × worktree linkada.** `--git-dir` igual a `--git-common-dir` é
+  checkout principal: reusa agente `idle` (antes) ou `done` com cwd na raiz.
+  Worktree linkada é território de uma tarefa: qualquer agente lá → exit 3.
+  Agente `working` no repo também → exit 3; quem decide é o humano.
+- **"Agente no repo" é cwd na raiz ou num subdiretório cujo toplevel é a
+  raiz.** Prefixo de caminho erra com worktree aninhada (`<repo>/.wt/x`).
+- **`hc ls` é lido por `\x1f`, não TAB**: terminal sem name colapsaria dois
+  TABs no `read` e deslocaria as colunas.
+- **As recusas mantêm `[repo-lane:...]`**: a extensão `repo-lane.ts` do omp
+  depende desse prefixo.
+- **Só lê o disco** (`git rev-parse`) e fala com os sockets do hc/herdr-app:
+  roda sob o sandbox sem write.
+
+Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais em
+`~/Sites/temp-files` e um mutante por ramo, morto pelo nome).
 
 ## Licença
 
