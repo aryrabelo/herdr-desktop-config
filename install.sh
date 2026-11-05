@@ -10,10 +10,15 @@
 #   Destino que não é symlink, ou symlink para fora de dotfiles-2026/herdr-lane/nix store: avisa e pula.
 #
 # Origem dos mods (copiados de mods/, nunca symlink):
-#   next-needed    deste repo
-#   pane-head      deste repo (clone do `pane` do Herdr 0.1.13 + nome e endereço do agente)
-#   space-folders  jankeesvw/herdr-space-folders @ 63a78b20d5ed30d57166a3c7165a6eb558c3ef84 (MIT),
-#                  com um patch daqui: estado do PR da branch (gh pr view) na linha do space
+#   next-needed     deste repo
+#   session-status  deste repo (barra de baixo do `ary`: resumo da sessão + passeio de agentes)
+#   ary-menu        deste repo (menu do terminal: cópia do `menu` do Herdr 0.1.13 + "Copy pane info")
+#   pane-head       deste repo (clone do `pane` do Herdr 0.1.13 + nome e endereço do agente; opcional)
+#   space-folders   jankeesvw/herdr-space-folders @ 63a78b20d5ed30d57166a3c7165a6eb558c3ef84 (MIT),
+#                   com um patch daqui: estado do PR da branch (gh pr view) na linha do space
+#   html-viewer     NÃO redistribuído (upstream sem licença): clonado de frizynn/html-viewer
+#                   @ $HTML_VIEWER_REV na hora, em ${XDG_CACHE_HOME:-~/.cache}/herdr-desktop-config/.
+#                   Sem rede: avisa e segue.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,8 +45,8 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP="$DEST/backup-$STAMP"
 
 # 1. Backup do que vai ser sobrescrito. -L copia o conteúdo de symlinks.
-MODS=(next-needed pane-head space-folders)
-TARGETS=(keys.json settings.json layouts/ary.json layouts/main-folders.json)
+MODS=(next-needed session-status ary-menu pane-head space-folders)
+TARGETS=(keys.json settings.json layouts/ary.json mods/html-viewer)
 for m in "${MODS[@]}"; do TARGETS+=("mods/$m"); done
 for t in "${TARGETS[@]}"; do
   if [ -e "$DEST/$t" ] || [ -L "$DEST/$t" ]; then
@@ -60,7 +65,6 @@ install_file() { # origem destino
 install_file "$REPO/config/keys.json"               "$DEST/keys.json"
 install_file "$REPO/config/settings.json"           "$DEST/settings.json"
 install_file "$REPO/config/layouts/ary.json"          "$DEST/layouts/ary.json"
-install_file "$REPO/config/layouts/main-folders.json" "$DEST/layouts/main-folders.json"
 
 # 3. Mods de mods/: sempre cópia, nunca symlink (o Herdr não percebe mudança dentro de pasta linkada).
 run mkdir -p "$DEST/mods"
@@ -68,11 +72,38 @@ for m in "${MODS[@]}"; do
   run rm -rf "$DEST/mods/$m"
   run cp -R "$REPO/mods/$m" "$DEST/mods/$m"
 done
+# 3b. html-viewer: clona o upstream num cache (não redistribuído aqui).
+HTML_VIEWER_URL="https://github.com/frizynn/html-viewer"
+HTML_VIEWER_REV="84f56798735fc59be467cd9f3942e98f257d3908"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/herdr-desktop-config/html-viewer"
+HV_OK=0
+if [ "$DRY" = 1 ]; then
+  printf '[dry-run] clonar %s @ %s em %s; copiar mods/html-viewer\n' "$HTML_VIEWER_URL" "$HTML_VIEWER_REV" "$CACHE"
+  HV_OK=1
+elif ! command -v git >/dev/null 2>&1; then
+  echo "aviso: sem git; html-viewer não instalado" >&2
+else
+  if [ "$(git -C "$CACHE" rev-parse HEAD 2>/dev/null)" != "$HTML_VIEWER_REV" ]; then
+    rm -rf "$CACHE"; mkdir -p "$CACHE"
+    git -C "$CACHE" init -q &&
+      git -C "$CACHE" fetch -q --depth 1 "$HTML_VIEWER_URL" "$HTML_VIEWER_REV" &&
+      git -C "$CACHE" -c advice.detachedHead=false checkout -q FETCH_HEAD ||
+      rm -rf "$CACHE"
+  fi
+  if [ -d "$CACHE/mods/html-viewer" ]; then
+    rm -rf "$DEST/mods/html-viewer"
+    cp -R "$CACHE/mods/html-viewer" "$DEST/mods/html-viewer"
+    HV_OK=1
+  else
+    echo "aviso: não consegui baixar o html-viewer (sem rede?); segui sem ele" >&2
+  fi
+fi
 
 # 4. Valida cada mod.
 for m in "${MODS[@]}"; do
   run herdr-app check "$DEST/mods/$m"
 done
+if [ "$HV_OK" = 1 ]; then run herdr-app check "$DEST/mods/html-viewer"; fi
 
 # 5. Links globais do herdr-lane. Só troca destino que não existe ou é symlink
 #    "nosso" (dotfiles-2026, herdr-lane, /nix/store do home-manager).
@@ -103,6 +134,6 @@ if [ "$DRY" = 1 ]; then
   echo "dry-run: nada foi gravado. Backup iria para $BACKUP"
 else
   [ -d "$BACKUP" ] && echo "backup: $BACKUP"
-  echo "ok. Troque de layout com cmd-shift-l (ou: herdr-app do layout.switch --name main-folders)."
+  echo "ok. Layout: herdr-app do layout.switch --name ary (ou cmd-shift-l)."
   echo "Pastas por projeto: edite e rode space-folders/auto-pastas.sh --dry-run"
 fi

@@ -8,12 +8,14 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 
 | peça | arquivo | o que faz |
 |---|---|---|
-| atalhos | `config/keys.json` | atalhos globais, de terminal e uma seção só do layout `main-folders` |
+| atalhos | `config/keys.json` | atalhos globais, de terminal e a seção `layout:ary` (⌘⌥] / ⌘⌥[ e ⌥⇧⌘] / ⌥⇧⌘[) |
 | settings | `config/settings.json` | zoom 0.9, tema escuro, sons ligados |
-| layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar padrão (spaces + agents) e o cabeçalho `pane-head` em cada pane |
-| layout `main-folders` | `config/layouts/main-folders.json` | igual ao `ary`, mas a lista de spaces vira o mod `space-folders` |
+| layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar em pastas (`space-folders`), a barra de baixo `session-status` e o menu de terminal `ary-menu` |
 | mod `next-needed` | `mods/next-needed/` | ⌘J foca o próximo agente que precisa de você |
-| mod `pane-head` | `mods/pane-head/` | cabeçalho do pane (clone do `pane` do Herdr): com agente, mostra o nome dele e o endereço no hc (`t2y`), o mesmo que os agentes usam quando falam de um terminal |
+| mod `session-status` | `mods/session-status/` | barra de baixo: o que o `workspace-status` mostra mais o resumo da sessão do agente em foco; passeio de agentes por prioridade (⌥⇧⌘] / ⌥⇧⌘[) |
+| mod `ary-menu` | `mods/ary-menu/` | menu do botão direito no terminal: o `menu` do Herdr 0.1.13 com **Copy pane info** |
+| mod `pane-head` | `mods/pane-head/` | opcional, instalado mas fora do layout: cabeçalho do pane com o nome do agente e o endereço no hc (`t2y`). Para usar, troque `"mod": "pane"` por `"mod": "pane-head"` no `ary.json` |
+| mod `html-viewer` | não está no repo | abre `.html`/`.md` numa aba (veja "html-viewer" abaixo) |
 | mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja abaixo) |
 | pastas automáticas | `space-folders/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
@@ -26,7 +28,7 @@ o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
 
 | estado | cor | sinal |
 |---|---|---|
-| merged | roxo (`ansi5`) | `✓` |
+| merged | roxo forte (`#b16cff`; o `ansi5` do tema ficava apagado) | `✓` |
 | aberto, checks rodando | amarelo (`ansi3`) | `●` |
 | aberto, checks verdes | verde (`ansi2`) | `✓` |
 | aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
@@ -71,8 +73,8 @@ dele está agora. Arrastar um space para uma pasta vence qualquer regra.
 | atalho | ação |
 |---|---|
 | ⌘J | pula para o próximo agente que precisa de você: primeiro os `blocked`, depois os `done`; apertar de novo passa para o seguinte |
-| ⌘⌥[ / ⌘⌥] | space anterior / próximo |
-| ⌥↑ / ⌥↓ | space anterior / próximo **na ordem das pastas** (só no layout `main-folders`) |
+| ⌘⌥[ / ⌘⌥] | space anterior / próximo **na ordem das pastas** (pula pasta dobrada) |
+| ⌥⇧⌘[ / ⌥⇧⌘] | agente anterior / próximo por prioridade: blocked > done > idle > working |
 | ⌘⇧L | troca de layout (`layout.switch`) |
 | ⌘[ / ⌘] | agente anterior / próximo |
 | ⌘B | mostra/esconde a sidebar |
@@ -84,7 +86,7 @@ O resto está em `config/keys.json`.
 ## Instalar
 
 Pré-requisitos: Herdr desktop com `herdr-app` no PATH e, para as pastas
-automáticas, `jq`. Não precisa de rede nem de `git` para instalar.
+automáticas, `jq`. O `html-viewer` precisa de `git` e rede (sem eles o resto instala).
 
 ```bash
 git clone https://github.com/aryrabelo/herdr-desktop-config.git
@@ -96,11 +98,13 @@ bash install.sh             # instala
 O `install.sh`:
 
 1. faz backup do que vai sobrescrever em `~/.config/herdr-app/backup-<data>/`;
-2. copia `keys.json`, `settings.json` e os dois layouts (apaga antes o
+2. copia `keys.json`, `settings.json` e o layout `ary` (apaga antes o
    destino, então um symlink do home-manager é trocado por arquivo);
-3. copia os mods `next-needed`, `pane-head` e `space-folders` de `mods/` — **cópia, nunca
-   symlink**: o Herdr não percebe mudança dentro de pasta de mod linkada;
-4. roda `herdr-app check` em cada mod.
+3. copia os mods `next-needed`, `session-status`, `ary-menu`, `pane-head` e
+   `space-folders` de `mods/` — **cópia, nunca symlink**: o Herdr não percebe
+   mudança dentro de pasta de mod linkada;
+4. baixa o `html-viewer` (veja abaixo) e copia o mod dele;
+5. roda `herdr-app check` em cada mod.
 
 Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
 
@@ -108,7 +112,29 @@ Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
 estiver no repo (é o `install.sh`), `just dry-run` só mostra e `just test`
 roda o teste do `herdr-lane`.
 
-Depois, ⌘⇧L e escolha `main-folders`.
+Depois, ⌘⇧L e escolha `ary`.
+
+O layout `main-folders` saiu: o `ary` já usa o `space-folders`, e dois layouts
+iguais só davam dois lugares para manter. Quem tinha `main-folders.json`
+instalado fica com o arquivo antigo; pode apagá-lo.
+
+Editar um mod: edite aqui e rode `just update` (ou edite em
+`~/.config/herdr-app/mods/` e traga de volta). Mais em `AGENTS.md`.
+
+### html-viewer
+
+[frizynn/html-viewer](https://github.com/frizynn/html-viewer) abre `.html` ou
+`.md` numa aba: um Chrome headless desenha a página (com JS) e a aba recebe a
+imagem, só leitura. Precisa de Node 22+ e Chrome.
+
+```bash
+herdr-app do tab.new '{"mod":"html-viewer","props":{"file":"~/x.html"}}'
+```
+
+O upstream não tem licença, então ele **não é redistribuído** aqui: o
+`install.sh` clona o commit `84f56798735fc59be467cd9f3942e98f257d3908` em
+`${XDG_CACHE_HOME:-~/.cache}/herdr-desktop-config/` e copia o mod de lá. Sem
+rede, avisa e segue.
 
 ## Pastas automáticas
 
@@ -224,4 +250,5 @@ Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais em
 
 MIT (`LICENSE`). O `mods/space-folders/` é de Jankees van Woezik, também MIT,
 redistribuído com o `LICENSE` original dentro da pasta e um patch nosso (estado
-do PR), marcado no código. O `mods/pane-head/` parte do mod `pane` que vem com o Herdr.
+do PR), marcado no código. `mods/pane-head/` e `mods/ary-menu/` partem dos mods
+`pane` e `menu` que vêm com o Herdr. O `html-viewer` não é redistribuído.

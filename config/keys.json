@@ -71,12 +71,10 @@
     "cmd-right": "send:\u0005",
     "cmd-backspace": "send:\u0015"
   },
-  "layout:main-folders": {
-    "alt-down": "space-folders.next",
-    "alt-up": "space-folders.prev",
-    "ctrl-shift-pagedown": "space-folders.next",
-    "ctrl-shift-pageup": "space-folders.prev",
-    "ctrl-space shift-n": "space-folders.next",
-    "ctrl-space shift-p": "space-folders.prev"
+  "layout:ary": {
+    "cmd-alt-]": "space-folders.next",
+    "cmd-alt-[": "space-folders.prev",
+    "cmd-alt-shift-]": "session-status.agent-next",
+    "cmd-alt-shift-[": "session-status.agent-prev"
   }
 }

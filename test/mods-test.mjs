@@ -44,7 +44,7 @@ ok(sf.rollup([{ status: "COMPLETED", conclusion: "SUCCESS" }, { state: "SUCCESS"
 ok(sf.rollup([{ status: "IN_PROGRESS", conclusion: "" }, { status: "COMPLETED", conclusion: "SUCCESS" }]) === "pending", "rollup: um rodando → pending");
 ok(sf.rollup([{ status: "IN_PROGRESS" }, { status: "COMPLETED", conclusion: "FAILURE" }]) === "failure", "rollup: um vermelho ganha de rodando → failure");
 ok(sf.rollup([{ state: "PENDING" }]) === "pending" && sf.rollup([]) === "none", "rollup: status PENDING → pending; sem checks → none");
-ok(sf.prTone(t, { state: "MERGED" }) === "purple", "tom: merged roxo");
+ok(sf.prTone(t, { state: "MERGED" }) === sf.MERGED && sf.MERGED !== t.ansi5, "tom: merged roxo forte (não o ansi5 do tema)");
 ok(sf.prTone(t, { state: "CLOSED" }) === "red" && sf.prTone(t, { state: "OPEN", draft: true, checks: "success" }) === "dim", "tom: fechado vermelho, draft apagado");
 ok(["pending", "success", "failure"].map((c) => sf.prTone(t, { state: "OPEN", checks: c })).join() === "yellow,green,red", "tom: aberto por checks amarelo/verde/vermelho");
 ok(sf.prTone(t, null) === null, "tom: sem PR → null (ícone cinza de sempre)");
