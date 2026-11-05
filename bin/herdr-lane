@@ -1,0 +1,291 @@
+#!/usr/bin/env bash
+# herdr-lane — manda trabalho pra um agente omp NO repo dono do caminho, no
+# Herdr desktop (hc = herdr-core, dono dos terminais/agentes; herdr-app do =
+# comandos da janela). Antes se chamava bora-lane (alias instalado pelo
+# install.sh por algumas semanas).
+#
+# Pacote "lane" (2026-11-03): uma sessão omp lê em qualquer lugar mas só
+# escreve no próprio repo (lane = git toplevel do cwd; worktree linkada é
+# lane própria). Quer escrever fora? Escreve o brief em
+# ~/Sites/.agent-notes/ e chama isto: o agente do repo-alvo faz o trabalho,
+# num space visível do Herdr, enraizado na raiz do repo.
+#
+#   herdr-lane <path> (--brief-file <file> | --brief <text>) [--from <label>] [--dry-run]
+#
+# Exit 0: despachado e o turno do agente COMEÇOU. stdout = UMA linha JSON
+#   {"repo_root","workspace_id","pane","agent","reused":bool}
+#   workspace_id = space do Herdr (sp…; null se o hc não souber), pane =
+#   endereço do terminal no hc (t2f), agent = o name do terminal no hc, ou o
+#   endereço quando não tem name. stderr = "herdr-lane: <repo> → <agent> (<pane>)".
+#   Acompanhar: `hc wait <agent> --timeout 3600` (bash async); "reason":
+#   "timeout" é só check-in, rode de novo; outro reason = parou, e
+#   `hc read <agent> --lines 80` mostra a tela.
+# Exit 1: o hc/herdr-app falhou (sem servidor, space.new recusou, send
+#   recusou), ou o agente novo não começou o turno em HERDR_LANE_START_S
+#   (bloqueou na partida, saiu, ou não reagiu). O space fica aberto: a
+#   mensagem nomeia space e terminal.
+# Exit 2: uso errado, --brief começando com "-" (o omp leria como flag), ou
+#   <path> fora de qualquer repo git.
+# Exit 3: recusa de auto-despacho (JSON nomeia o terminal): agente `working`
+#   no repo-alvo, ou worktree linkada que já tem agente (território de outra
+#   tarefa). Quem decide é o humano.
+# Exit 4: o alvo é a lane de quem chamou — nada a rotear, escreva você.
+#
+# Reusa agente idle (antes) ou done com cwd == raiz SÓ em checkout principal
+# (`hc send`); senão `herdr-app do space.new --folder <raiz> --argv
+# '["omp-safe"]' --task <prompt>` (não rouba o foco; a task é a 1ª mensagem
+# do omp, sem corrida de colagem) e espera o turno começar: logo depois do
+# launch o hc diz idle/turn 0 por ~2 s, e um `hc wait` ali voltaria na hora.
+# Nome do space novo: <repo>·<slug>. Com --brief-file, slug = basename do
+# brief sem .md, sem a data YYYY-MM-DD- e sem o prefixo <from>-to-<repo>-
+# (até 48 caracteres, cortado num "-"); vazio ou --brief → de-<from>. No
+# reuso o space não é renomeado.
+# --dry-run só roda o `hc ls --json`/`hc get` (leitura), imprime os comandos.
+# Só LÊ o disco (git rev-parse) e fala com os sockets do hc/herdr-app: roda
+# sob srt.
+# Env: HC_BIN, HERDR_APP_BIN (binários; teste), HERDR_LANE_START_S (espera do
+# início do turno, padrão 90), HERDR_LANE_POLL_S (intervalo, padrão 1). Os
+# nomes antigos BORA_LANE_START_S/BORA_LANE_POLL_S valem como fallback.
+# As recusas mantêm o prefixo [repo-lane:...] (a extensão repo-lane.ts do omp
+# depende dele). Detalhe e porquês: README.md, seção herdr-lane.
+set -euo pipefail
+
+HC="${HC_BIN:-hc}"
+HAPP="${HERDR_APP_BIN:-herdr-app}"
+START_S="${HERDR_LANE_START_S:-${BORA_LANE_START_S:-90}}"
+POLL_S="${HERDR_LANE_POLL_S:-${BORA_LANE_POLL_S:-1}}"
+ME=herdr-lane
+
+usage() {
+  echo "uso: $ME <path> (--brief-file <file> | --brief <text>) [--from <label>] [--dry-run]" >&2
+  exit 2
+}
+die2() { echo "$ME: $*" >&2; exit 2; }
+die1() { echo "$ME: $*" >&2; exit 1; }
+
+# Caminho absoluto e real (symlinks resolvidos) do ancestral existente mais
+# próximo. Arquivo vira o diretório dele.
+nearest_dir() {
+  local p="$1"
+  case "$p" in
+    "~") p="$HOME" ;;
+    "~/"*) p="$HOME/${p#\~/}" ;;
+    /*) ;;
+    *) p="$PWD/$p" ;;
+  esac
+  while [ ! -e "$p" ]; do
+    [ "$p" = / ] && break
+    p="$(dirname "$p")"
+  done
+  [ -d "$p" ] || p="$(dirname "$p")"
+  (cd "$p" && pwd -P)
+}
+
+toplevel() { git -C "$1" rev-parse --show-toplevel 2>/dev/null; }
+
+target="" brief="" brief_file="" from="" dry=0 have_brief=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --brief) [ $# -ge 2 ] || usage; brief="$2"; have_brief=$((have_brief + 1)); shift 2 ;;
+    --brief-file) [ $# -ge 2 ] || usage; brief_file="$2"; have_brief=$((have_brief + 1)); shift 2 ;;
+    --from) [ $# -ge 2 ] || usage; from="$2"; shift 2 ;;
+    --dry-run) dry=1; shift ;;
+    -h|--help) usage ;;
+    -*) echo "$ME: opção desconhecida: $1" >&2; usage ;;
+    *) [ -z "$target" ] || usage; target="$1"; shift ;;
+  esac
+done
+[ -n "$target" ] || usage
+[ "$have_brief" = 1 ] || usage
+
+if [ -n "$brief_file" ]; then
+  case "$brief_file" in
+    "~/"*) brief_file="$HOME/${brief_file#\~/}" ;;
+    /*) ;;
+    *) brief_file="$PWD/$brief_file" ;;
+  esac
+  [ -f "$brief_file" ] && [ -r "$brief_file" ] || die2 "brief não legível: $brief_file"
+  brief_file="$(cd "$(dirname "$brief_file")" && pwd -P)/$(basename "$brief_file")"
+  prompt="Leia $brief_file e execute"
+else
+  [ -n "$brief" ] || die2 "--brief vazio"
+  # A task vira argv do omp: texto começando com "-" seria lido como flag.
+  case "$brief" in -*) die2 "--brief não pode começar com '-' (o omp leria como flag): $brief" ;; esac
+  prompt="$brief"
+fi
+
+dir="$(nearest_dir "$target")"
+R="$(toplevel "$dir")" || die2 "fora de qualquer repo git: $target (ancestral existente: $dir)"
+[ -n "$R" ] || die2 "fora de qualquer repo git: $target (ancestral existente: $dir)"
+
+here="$(pwd -P)"
+own="$(toplevel "$here")" || own="$here"
+[ -n "$own" ] || own="$here"
+if [ "$R" = "$own" ]; then
+  echo "$ME: [repo-lane:own-lane] $R já é a tua lane: escreva aí mesmo, nada a rotear" >&2
+  exit 4
+fi
+[ -n "$from" ] || from="$(basename "$own")"
+repo="$(basename "$R")"
+
+gitdir="$(git -C "$R" rev-parse --path-format=absolute --git-dir)"
+common="$(git -C "$R" rev-parse --path-format=absolute --git-common-dir)"
+gitdir="$(cd "$gitdir" && pwd -P)"
+common="$(cd "$common" && pwd -P)"
+linked=0
+[ "$gitdir" = "$common" ] || linked=1
+
+ls_json="$("$HC" ls --json 2>&1)" || die1 "hc ls --json falhou: $ls_json"
+# Só terminais vivos com agente (shell puro tem agent null). Endereço, nome,
+# status, cwd — uma linha por agente, campos separados por US (\x1f). TAB não
+# serve: é espaço pro `read`, e nome vazio (terminal sem name) colapsaria e
+# deslocaria as colunas. No `ls` o status é string (ou null).
+US=$'\x1f'
+rows="$(jq -r '.terminals[] | select(.state == "live" and .agent != null)
+  | [.address, (.name // ""), (if (.status | type) == "string" then .status else "" end), (.cwd // "")]
+  | join("\u001f")' <<<"$ls_json")" \
+  || die1 "resposta inesperada do hc ls --json: $ls_json"
+
+# Agentes NA lane R: cwd == R, ou subdiretório de R cujo toplevel é R (uma
+# worktree aninhada dentro de R é outra lane).
+in_r=""
+while IFS="$US" read -r a_addr a_name a_status a_cwd; do
+  [ -n "$a_addr" ] || continue
+  a_cwd="${a_cwd%/}"
+  case "$a_cwd" in
+    "$R") ;;
+    "$R"/*) [ "$(toplevel "$a_cwd")" = "$R" ] || continue ;;
+    *) continue ;;
+  esac
+  in_r="${in_r}${a_addr}${US}${a_name}${US}${a_status}${US}${a_cwd}"$'\n'
+done <<<"$rows"
+
+refuse() { # $1 regra, $2 endereço, $3 nome, $4 status, $5 frase
+  jq -nc --arg r "$R" --arg rule "$1" --arg p "$2" --arg a "${3:-$2}" --arg s "$4" \
+    '{refused:$rule, repo_root:$r, pane:$p, agent:$a, agent_status:$s}'
+  echo "$ME: [repo-lane:$1] $5 — terminal $2; pergunte ao Ary" >&2
+  exit 3
+}
+
+while IFS="$US" read -r a_addr a_name a_status a_cwd; do
+  if [ -n "$a_addr" ] && [ "$a_status" = working ]; then
+    refuse busy "$a_addr" "$a_name" "$a_status" "agente trabalhando em $R"
+  fi
+done <<<"$in_r"
+
+if [ "$linked" = 1 ]; then
+  while IFS="$US" read -r a_addr a_name a_status a_cwd; do
+    if [ -n "$a_addr" ]; then
+      refuse worktree-occupied "$a_addr" "$a_name" "$a_status" "worktree linkada $R já tem agente (território de outra tarefa)"
+    fi
+  done <<<"$in_r"
+fi
+
+emit() { # $1 space, $2 terminal, $3 agente, $4 reused(true|false)
+  local extra='{}'
+  [ "$dry" = 1 ] && extra='{"dry_run":true}'
+  jq -nc --arg r "$R" --arg w "$1" --arg p "$2" --arg a "$3" --argjson u "$4" --argjson x "$extra" \
+    'def n: if . == "" then null else . end;
+     {repo_root:$r, workspace_id:($w | n), pane:($p | n), agent:($a | n), reused:$u} + $x'
+  [ "$dry" = 1 ] || echo "$ME: $repo → $3 ($2)" >&2
+}
+show() { # imprime o comando que o --dry-run pularia
+  local q="" x
+  for x in "$@"; do q="$q $(printf '%q' "$x")"; done
+  echo "$ME: dry-run:$q" >&2
+}
+
+# Espera o turno pedido começar: turn > $3 (o turn de antes) ou status
+# working. Sem isso o `hc wait` do chamador volta na hora: logo depois do
+# launch o hc diz idle/turn 0 (~2 s medidos), e um agente reusado ainda mostra
+# o done do turno anterior. Deixa o name do terminal em $t_name.
+esperar_turno() { # $1 space, $2 terminal, $3 turn de antes
+  local deadline=$((SECONDS + START_S)) last="" g t_turn t_state t_live
+  while :; do
+    if g="$("$HC" get "$2" --json 2>&1)"; then
+      last="$g"
+      # turn, status, state do terminal e o name (por último: pode ter espaço).
+      t_turn=0 t_state=- t_live=live t_name=""
+      read -r t_turn t_state t_live t_name < <(jq -r '[
+          (.turn | if type == "number" then floor else 0 end),
+          (.status | if type == "object" then (.state // "-") elif type == "string" then . else "-" end),
+          (.state // "live"),
+          (.name // "")
+        ] | map(tostring) | join(" ")' <<<"$g" 2>/dev/null || echo "0 - live") || true
+      if [ "${t_turn:-0}" -gt "$3" ] || [ "$t_state" = working ]; then
+        return 0
+      fi
+      if [ "$t_live" != live ]; then
+        die1 "agente saiu antes do turno (state $t_live) — space $1, terminal $2 (o space fica aberto)"
+      fi
+      if [ "$t_state" = blocked ]; then
+        die1 "agente bloqueado antes do turno — space $1, terminal $2 (o space fica aberto; veja \`$HC read $2 --lines 80\`)"
+      fi
+    else
+      last="$g"
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      die1 "agente não começou o turno em ${START_S}s — space $1, terminal $2 (o space fica aberto; último hc get: $last)"
+    fi
+    sleep "$POLL_S"
+  done
+}
+
+if [ "$linked" = 0 ]; then
+  p_addr="" p_name=""
+  for want in idle done; do
+    while IFS="$US" read -r a_addr a_name a_status a_cwd; do
+      if [ -n "$a_addr" ] && [ "$a_cwd" = "$R" ] && [ "$a_status" = "$want" ]; then
+        p_addr="$a_addr" p_name="$a_name"
+        break 2
+      fi
+    done <<<"$in_r"
+  done
+  if [ -n "$p_addr" ]; then
+    # Space (informativo; sem ele vira null) e turn de antes do send.
+    p_get="$("$HC" get "$p_addr" --json 2>/dev/null)" || p_get=""
+    p_ws="$(jq -r '.labels["herdr.space"] // empty' <<<"$p_get" 2>/dev/null)" || p_ws=""
+    p_turn="$(jq -r '.turn | if type == "number" then floor else 0 end' <<<"$p_get" 2>/dev/null)" || p_turn=0
+    [ -n "$p_turn" ] || p_turn=0
+    if [ "$dry" = 1 ]; then
+      show "$HC" send "$p_addr" "$prompt"
+    else
+      out="$("$HC" send "$p_addr" "$prompt" 2>&1)" || die1 "hc send $p_addr falhou (exit 9 = bloqueado): $out"
+      esperar_turno "$p_ws" "$p_addr" "$p_turn"
+    fi
+    emit "$p_ws" "$p_addr" "${p_name:-$p_addr}" true
+    exit 0
+  fi
+fi
+
+# Nome do space pelo assunto do brief (só no space novo; reuso não renomeia).
+slug=""
+if [ -n "$brief_file" ]; then
+  slug="$(basename "$brief_file" .md)"
+  slug="$(sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}-//' <<<"$slug")"
+  slug="${slug#"${from}-to-${repo}-"}"
+  if [ "${#slug}" -gt 48 ]; then
+    cut="${slug:0:48}"
+    if [ "${slug:48:1}" != - ] && [[ "$cut" == *-* ]]; then cut="${cut%-*}"; fi
+    slug="$cut"
+  fi
+  while [[ "$slug" == *- ]]; do slug="${slug%-}"; done
+fi
+[ -n "$slug" ] || slug="de-${from}"
+label="${repo}·${slug}"
+argv='["omp-safe"]'
+
+if [ "$dry" = 1 ]; then
+  show "$HAPP" do space.new --name "$label" --folder "$R" --argv "$argv" --task "$prompt"
+  emit "" "" "" false
+  exit 0
+fi
+
+sp_json="$("$HAPP" do space.new --name "$label" --folder "$R" --argv "$argv" --task "$prompt" 2>&1)" \
+  || die1 "herdr-app do space.new falhou: $sp_json"
+space="$(jq -r '.space // empty' <<<"$sp_json" 2>/dev/null)" || space=""
+term="$(jq -r '.terminal // empty' <<<"$sp_json" 2>/dev/null)" || term=""
+[ -n "$space" ] && [ -n "$term" ] || die1 "space.new sem space/terminal: $sp_json"
+
+esperar_turno "$space" "$term" 0
+emit "$space" "$term" "${t_name:-$term}" false
