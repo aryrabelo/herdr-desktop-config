@@ -143,15 +143,17 @@ export function rollup(list) {
   if (list.some((c) => (c.status && c.status !== "COMPLETED") || ["PENDING", "EXPECTED"].includes(c.state))) return "pending";
   return list.length ? "success" : "none";
 }
-// Color like GitHub: merged purple (a fixed bright purple: the theme's ansi5 is
-// too faint next to the other tones), closed red, draft dim; an open PR by its checks.
+// Color like GitHub: merged purple, green checks, yellow running (fixed vivid
+// colors: the theme's ansi5/ansi2/ansi3 are too faint), closed red, draft dim.
 export const MERGED = "#b16cff";
+export const PASSING = "#22e05a";
+export const RUNNING = "#ffc400";
 export function prTone(t, p) {
   if (!p) return null;
   if (p.state === "MERGED") return MERGED;
   if (p.state === "CLOSED") return t.ansi1;
   if (p.draft) return t.dim;
-  return { failure: t.ansi1, pending: t.ansi3, success: t.ansi2 }[p.checks] ?? t.foreground;
+  return { failure: t.ansi1, pending: RUNNING, success: PASSING }[p.checks] ?? t.foreground;
 }
 export const prGlyph = (p) => p.state === "MERGED" ? "\u2713" : p.state === "CLOSED" ? "\u00d7" : p.draft ? "\u25cc"
   : { failure: "\u2717", pending: "\u25cf", success: "\u2713" }[p.checks] ?? "\u25cb";

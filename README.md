@@ -28,9 +28,9 @@ o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
 
 | estado | cor | sinal |
 |---|---|---|
-| merged | roxo forte (`#b16cff`; o `ansi5` do tema ficava apagado) | `✓` |
-| aberto, checks rodando | amarelo (`ansi3`) | `●` |
-| aberto, checks verdes | verde (`ansi2`) | `✓` |
+| merged | roxo forte (`#b16cff`) | `✓` |
+| aberto, checks rodando | amarelo forte (`#ffc400`) | `●` |
+| aberto, checks verdes | verde forte (`#22e05a`) | `✓` |
 | aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
 | draft | apagado (`dim`) | `◌` |
 | fechado | vermelho | `×` |

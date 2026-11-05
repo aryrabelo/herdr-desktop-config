@@ -46,15 +46,15 @@ ok(sf.rollup([{ status: "IN_PROGRESS" }, { status: "COMPLETED", conclusion: "FAI
 ok(sf.rollup([{ state: "PENDING" }]) === "pending" && sf.rollup([]) === "none", "rollup: status PENDING → pending; sem checks → none");
 ok(sf.prTone(t, { state: "MERGED" }) === sf.MERGED && sf.MERGED !== t.ansi5, "tom: merged roxo forte (não o ansi5 do tema)");
 ok(sf.prTone(t, { state: "CLOSED" }) === "red" && sf.prTone(t, { state: "OPEN", draft: true, checks: "success" }) === "dim", "tom: fechado vermelho, draft apagado");
-ok(["pending", "success", "failure"].map((c) => sf.prTone(t, { state: "OPEN", checks: c })).join() === "yellow,green,red", "tom: aberto por checks amarelo/verde/vermelho");
+ok(["pending", "success", "failure"].map((c) => sf.prTone(t, { state: "OPEN", checks: c })).join() === [sf.RUNNING, sf.PASSING, "red"].join(), "tom: aberto por checks amarelo/verde forte, vermelho");
 ok(sf.prTone(t, null) === null, "tom: sem PR → null (ícone cinza de sempre)");
 
 if (process.argv.includes("--live")) {
   const view = (n) => JSON.parse(execFileSync("gh", ["pr", "view", String(n), "--repo", "Mentor-Concursos/mentor-frontend", "--json", "number,state,isDraft,statusCheckRollup"], { encoding: "utf8" }));
   const p108 = view(108), p114 = view(114);
   const tone = (j) => sf.prTone(t, { n: j.number, state: j.state, draft: j.isDraft, checks: sf.rollup(j.statusCheckRollup ?? []) });
-  ok(p108.state === "MERGED" && tone(p108) === "purple", `live: PR 108 ${p108.state} → ${tone(p108)}`);
-  ok(p114.state !== "MERGED" && ["yellow", "green", "red", "dim", "fg"].includes(tone(p114)), `live: PR 114 ${p114.state}/${sf.rollup(p114.statusCheckRollup ?? [])} → ${tone(p114)}`);
+  ok(p108.state === "MERGED" && tone(p108) === sf.MERGED, `live: PR 108 ${p108.state} → ${tone(p108)}`);
+  ok(p114.state !== "MERGED" && [sf.RUNNING, sf.PASSING, "red", "dim", "fg"].includes(tone(p114)), `live: PR 114 ${p114.state}/${sf.rollup(p114.statusCheckRollup ?? [])} → ${tone(p114)}`);
 }
 
 console.log(fail ? `FALHOU (${fail})` : "MODS OK");
