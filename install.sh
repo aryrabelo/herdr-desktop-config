@@ -7,7 +7,9 @@
 #   $HERDR_LANE_BIN_DIR/herdr-lane         → $REPO/bin/herdr-lane        (padrão ~/.local/bin)
 #   $HERDR_LANE_BIN_DIR/bora-lane          → herdr-lane                   (alias temporário)
 #   $HERDR_LANE_RULES_DIR/herdr-lane.md    → $REPO/agent/rules/herdr-lane.md (padrão ~/.omp/agent/rules)
-#   Destino que não é symlink, ou symlink para fora de dotfiles-2026/herdr-lane/nix store: avisa e pula.
+#   Destino que não é symlink, ou symlink que não é nosso, avisa e pula. Nosso = aponta para a
+#   própria origem, para herdr-lane, para /nix/store/… ou casa com o glob $HERDR_LANE_ADOPT_FROM
+#   (vazio por padrão: não casa nada).
 #
 # Origem dos mods (copiados de mods/, nunca symlink):
 #   next-needed     deste repo
@@ -112,15 +114,23 @@ done
 if [ "$HV_OK" = 1 ]; then run herdr-app check "$DEST/mods/html-viewer"; fi
 
 # 5. Links globais do herdr-lane. Só troca destino que não existe ou é symlink
-#    "nosso" (dotfiles-2026, herdr-lane, /nix/store do home-manager).
+#    "nosso": a própria origem, herdr-lane, /nix/store do home-manager, ou o
+#    glob HERDR_LANE_ADOPT_FROM (ex.: '*/meus-dotfiles/*'; vazio = nenhum).
+ADOPT_FROM="${HERDR_LANE_ADOPT_FROM:-}"
+link_nosso() { # alvo-do-symlink origem
+  case "$1" in "$2"|herdr-lane|*/herdr-lane|*/herdr-lane.md|/nix/store/*) return 0 ;; esac
+  [ -n "$ADOPT_FROM" ] || return 1
+  # shellcheck disable=SC2254 # sem aspas de propósito: é glob
+  case "$1" in $ADOPT_FROM) return 0 ;; esac
+  return 1
+}
 link_global() { # origem(link) destino
   local src="$1" dst="$2" tgt
   if [ -L "$dst" ]; then
     tgt="$(readlink "$dst")"
-    case "$tgt" in
-      "$src"|*dotfiles-2026*|herdr-lane|*/herdr-lane|*/herdr-lane.md|/nix/store/*) ;;
-      *) echo "aviso: $dst aponta para $tgt (não é nosso); pulei" >&2; return 0 ;;
-    esac
+    if ! link_nosso "$tgt" "$src"; then
+      echo "aviso: $dst aponta para $tgt (não é nosso); pulei" >&2; return 0
+    fi
     run mkdir -p "$BACKUP/global"
     run cp -P "$dst" "$BACKUP/global/$(basename "$dst")"
   elif [ -e "$dst" ]; then

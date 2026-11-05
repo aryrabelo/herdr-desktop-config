@@ -33,10 +33,10 @@ const ph = await import(join(ROOT, "mods/pane-head/main.js"));
 const sf = await import(join(ROOT, "mods/space-folders/main.js"));
 await import(join(ROOT, "mods/next-needed/main.js"));
 
-const list = [{ address: "t2y", pane: "p1", space_name: "dotfiles-2026" }, { address: "t38", pane: "p9", space_name: "durable-pi" }];
+const list = [{ address: "t2y", pane: "p1", space_name: "alfa" }, { address: "t38", pane: "p9", space_name: "beta" }];
 const terms = [{ address: "t2y", name: "superagent" }, { address: "t38", name: null }];
 ok(JSON.stringify(ph.agentOf("p1", "t2y", list, terms)) === '{"address":"t2y","name":"superagent"}', "pane-head: agente com name no hc → name + endereço");
-ok(ph.agentOf("p9", null, list, terms)?.name === "durable-pi", "pane-head: sem name, usa o space");
+ok(ph.agentOf("p9", null, list, terms)?.name === "beta", "pane-head: sem name, usa o space");
 ok(ph.agentOf("pX", "tZZ", list, terms) === null, "pane-head: pane sem agente → null (cabeçalho original)");
 
 const t = { ansi1: "red", ansi2: "green", ansi3: "yellow", ansi5: "purple", dim: "dim", foreground: "fg" };
@@ -49,12 +49,15 @@ ok(sf.prTone(t, { state: "CLOSED" }) === "red" && sf.prTone(t, { state: "OPEN", 
 ok(["pending", "success", "failure"].map((c) => sf.prTone(t, { state: "OPEN", checks: c })).join() === [sf.RUNNING, sf.PASSING, "red"].join(), "tom: aberto por checks amarelo/verde forte, vermelho");
 ok(sf.prTone(t, null) === null, "tom: sem PR → null (ícone cinza de sempre)");
 
-if (process.argv.includes("--live")) {
-  const view = (n) => JSON.parse(execFileSync("gh", ["pr", "view", String(n), "--repo", "Mentor-Concursos/mentor-frontend", "--json", "number,state,isDraft,statusCheckRollup"], { encoding: "utf8" }));
-  const p108 = view(108), p114 = view(114);
+// Rede: MODS_TEST_PR_REPO=dono/repo MODS_TEST_PR_MERGED=<n> MODS_TEST_PR_OPEN=<n> node test/mods-test.mjs --live
+const live = process.env.MODS_TEST_PR_REPO;
+if (process.argv.includes("--live") && !live) console.log("  pulado — live: falta MODS_TEST_PR_REPO");
+if (process.argv.includes("--live") && live) {
+  const view = (n) => JSON.parse(execFileSync("gh", ["pr", "view", String(n), "--repo", live, "--json", "number,state,isDraft,statusCheckRollup"], { encoding: "utf8" }));
+  const merged = view(process.env.MODS_TEST_PR_MERGED), open = view(process.env.MODS_TEST_PR_OPEN);
   const tone = (j) => sf.prTone(t, { n: j.number, state: j.state, draft: j.isDraft, checks: sf.rollup(j.statusCheckRollup ?? []) });
-  ok(p108.state === "MERGED" && tone(p108) === sf.MERGED, `live: PR 108 ${p108.state} → ${tone(p108)}`);
-  ok(p114.state !== "MERGED" && [sf.RUNNING, sf.PASSING, "red", "dim", "fg"].includes(tone(p114)), `live: PR 114 ${p114.state}/${sf.rollup(p114.statusCheckRollup ?? [])} → ${tone(p114)}`);
+  ok(merged.state === "MERGED" && tone(merged) === sf.MERGED, `live: PR ${merged.number} ${merged.state} → ${tone(merged)}`);
+  ok(open.state !== "MERGED" && [sf.RUNNING, sf.PASSING, "red", "dim", "fg"].includes(tone(open)), `live: PR ${open.number} ${open.state}/${sf.rollup(open.statusCheckRollup ?? [])} → ${tone(open)}`);
 }
 
 console.log(fail ? `FALHOU (${fail})` : "MODS OK");

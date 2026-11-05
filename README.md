@@ -155,7 +155,7 @@ Formato desse arquivo:
 {
   "list": [
     {"id": "fauto1", "name": "Trabalho", "folded": false, "color": "ansi4",
-     "path": "~/Sites/work-team", "match": "~/Sites/work-team"}
+     "path": "~/code/trabalho", "match": "~/code/trabalho"}
   ],
   "of": {"<id do space>": "<id da pasta>"},
   "at": 1793812463000
@@ -195,8 +195,9 @@ pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
 ## herdr-lane
 
 Uma sessão omp lê em qualquer lugar e só escreve no próprio repo (a lane, raiz
-git do cwd). Para escrever em outro repo, ela escreve um brief em
-`~/Sites/.agent-notes/YYYY-MM-DD-<lane>-to-<repo>-<slug>.md` e chama:
+git do cwd). Para escrever em outro repo, ela escreve um brief na pasta de
+notas (`notes_dir` do config, abaixo), por exemplo
+`~/notes/2026-11-05-alfa-to-web-corrige-login.md`, e chama:
 
 ```bash
 herdr-lane <caminho alvo> --brief-file <brief> --from <lane> [--dry-run]
@@ -204,17 +205,47 @@ herdr-lane <caminho alvo> --brief-file <brief> --from <lane> [--dry-run]
 
 O `herdr-lane` reaproveita um agente parado naquele repo (`hc send`) ou abre
 um space novo `<repo>·<slug>` com `herdr-app do space.new --folder <raiz>
---argv '["omp-safe"]' --task "Leia <brief> e execute"`. Exits 0/1/2/3/4 e o
+--argv <agent_argv> --task "Leia <brief> e execute"`. Exits 0/1/2/3/4 e o
 JSON de uma linha estão no cabeçalho do script.
 
-Instalar: `just update`. Ele cria `~/.local/bin/herdr-lane`, o alias
+### Config
+
+O que é de cada máquina fica num arquivo fora do repo:
+`${HERDR_LANE_CONFIG:-~/.config/herdr-lane/config}`. Sem ele, valem os
+padrões.
+
+```
+# argv do agente no space.new (array JSON de strings; padrão ["omp"])
+agent_argv=["omp"]
+# onde os briefs ficam; só aparece no uso e nas mensagens de erro
+notes_dir=~/notes
+```
+
+- Uma linha `chave=valor` por opção; linha que começa com `#` é comentário e
+  chave desconhecida é ignorada.
+- O arquivo é lido linha a linha, nunca com `source`: `$(…)` nele é texto.
+- `agent_argv` que não é um array JSON não vazio de strings → exit 2,
+  dizendo de onde veio o valor.
+- `HERDR_LANE_AGENT_ARGV` vence o arquivo (vazia = não definida).
+- O `notes_dir` não tem padrão. O brief continua explícito em `--brief-file`;
+  `herdr-lane --help` mostra a pasta.
+
+O arquivo é de config e não de shell porque o `herdr-lane` roda sob agente, e
+lá `.envrc` e variável de shell não chegam de forma confiável.
+
+### Links globais
+
+`just update` cria `~/.local/bin/herdr-lane`, o alias
 `~/.local/bin/bora-lane → herdr-lane` (nome antigo, por algumas semanas) e
 `~/.omp/agent/rules/herdr-lane.md`, a regra que ensina o agente a usar o
-script. Os três são symlink para este repo. Destino que não é symlink, ou
-symlink para fora do `dotfiles-2026`/nix store, é avisado e pulado. As pastas
-mudam com `HERDR_LANE_BIN_DIR` e `HERDR_LANE_RULES_DIR`.
+script. Os três são symlink para este repo. Um destino que já existe só é
+trocado se for symlink "nosso": para a própria origem, para `herdr-lane`, para
+`/nix/store/…` ou para um caminho que case com o glob `HERDR_LANE_ADOPT_FROM`
+(vazio por padrão; ex.: `HERDR_LANE_ADOPT_FROM='*/meus-dotfiles/*'`). O resto é
+avisado e pulado. As pastas mudam com `HERDR_LANE_BIN_DIR` e
+`HERDR_LANE_RULES_DIR`.
 
-Os porquês:
+### Os porquês
 
 - **O nome do space é o assunto.** Com `--brief-file`, o slug é o nome do
   brief sem a data e sem o `<from>-to-<repo>-` (até 48 caracteres, cortado num
@@ -243,8 +274,9 @@ Os porquês:
 - **Só lê o disco** (`git rev-parse`) e fala com os sockets do hc/herdr-app:
   roda sob o sandbox sem write.
 
-Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais em
-`~/Sites/temp-files` e um mutante por ramo, morto pelo nome).
+Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais numa fixture em
+`${TMPDIR:-/tmp}` com `mktemp -d`, config do herdr-lane da fixture, nunca o
+real, e um mutante por ramo, morto pelo nome).
 
 ## Licença
 

@@ -5,8 +5,7 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mkdir -p "$HOME/Sites/temp-files"
-T="$(mktemp -d "$HOME/Sites/temp-files/install-smoke-XXXXXX")"
+T="$(mktemp -d "${TMPDIR:-/tmp}/install-smoke-XXXXXX")"
 trap 'rm -rf "$T"' EXIT
 
 fail=0

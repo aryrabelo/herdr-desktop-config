@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pastas automáticas (smart folders) do space-folders, uma por projeto/time.
 # Cada pasta coleta os spaces cujo terminal trabalha dentro do caminho em "match";
-# "Avulso" pega o resto de ~/Sites (a regra mais funda vence). O que você já
+# "Avulso" pega o resto de ~/code (a regra mais funda vence). O que você já
 # arrastou à mão continua valendo: arrasto vence regra.
 # Só ACRESCENTA pastas cujo nome ainda não existe; nas que já existem, completa
 # só regra, pasta de início e cor que estiverem faltando.
@@ -17,17 +17,17 @@ NOW_MS=$(( $(date +%s) * 1000 ))
 # color: ansi1..ansi6, "#hex" ou null (cinza). path: onde o "+" da pasta abre
 # um space novo. match: regras separadas por vírgula (~ = qualquer home).
 NEW='[
-  {"name":"Trabalho",  "color":"ansi4","path":"~/Sites/work-team",     "match":"~/Sites/work-team"},
-  {"name":"Cliente A", "color":"ansi2","path":"~/Sites/cliente-a",     "match":"~/Sites/cliente-a"},
-  {"name":"Open source","color":"ansi3","path":"~/Sites/oss",          "match":"~/Sites/oss"},
-  {"name":"Pessoal",   "color":"ansi5","path":"~/Sites/personal-team", "match":"~/Sites/personal-team"},
-  {"name":"Avulso",    "color":null,   "path":"~/Sites",               "match":"~/Sites"}
+  {"name":"Trabalho",  "color":"ansi4","path":"~/code/trabalho",  "match":"~/code/trabalho"},
+  {"name":"Cliente A", "color":"ansi2","path":"~/code/cliente-a", "match":"~/code/cliente-a"},
+  {"name":"Open source","color":"ansi3","path":"~/code/oss",      "match":"~/code/oss"},
+  {"name":"Pessoal",   "color":"ansi5","path":"~/code/pessoal",   "match":"~/code/pessoal"},
+  {"name":"Avulso",    "color":null,   "path":"~/code",           "match":"~/code"}
 ]'
 
 current='{"list":[],"of":{},"at":0}'
 [ -s "$FILE" ] && current=$(cat "$FILE")
 
-# Pasta que você já tem com o mesmo nome (sem acento/caixa: "aguia" = "Águia")
+# Pasta que você já tem com o mesmo nome (sem acento/caixa: "cafe" = "Café")
 # ganha as regras, a pasta de início e a cor que faltarem; as outras entram no fim.
 result=$(jq -n --argjson cur "$current" --argjson add "$NEW" --argjson now "$NOW_MS" '
   def norm: ascii_downcase | gsub("[áàâãÁÀÂÃ]"; "a") | gsub("[éêÉÊ]"; "e") | gsub("[íÍ]"; "i") | gsub("[óôõÓÔÕ]"; "o") | gsub("[úÚ]"; "u");

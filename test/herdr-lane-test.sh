@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Exercita bin/herdr-lane (e os links globais do install.sh) contra um `hc` e um `herdr-app` FALSOS
 # (HC_BIN/HERDR_APP_BIN: gravam o argv de cada chamada e respondem JSON
-# enlatado) e repos git DE VERDADE numa fixture em ~/Sites/temp-files:
+# enlatado) e repos git DE VERDADE numa fixture em ${TMPDIR:-/tmp} (mktemp -d):
 # checkout principal, worktree linkada e uma worktree aninhada dentro do
-# principal. Não fala com o Herdr real.
+# principal. Não fala com o Herdr real nem lê o config real do herdr-lane
+# (cada caso aponta HERDR_LANE_CONFIG para a fixture).
 #
 # Two-sided: a suíte roda no script de verdade (tem que passar) e depois em
 # MUTANTES, um por ramo crítico; cada um tem que reprovar ao menos um caso,
@@ -12,8 +13,7 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="${SRC:-$REPO/bin/herdr-lane}"
 INST_SRC="$REPO/install.sh"
-mkdir -p "$HOME/Sites/temp-files"
-T="$(mktemp -d "$HOME/Sites/temp-files/herdr-lane-fixture-XXXXXX")"
+T="$(mktemp -d "${TMPDIR:-/tmp}/herdr-lane-fixture-XXXXXX")"
 T="$(cd "$T" && pwd -P)"
 trap 'rm -rf "$T"' EXIT
 
@@ -37,6 +37,17 @@ echo "faz a coisa" > "$T/notes/2026-11-05-chamador-to-beta-merge-nomes-sidebar.m
 echo "faz a coisa" > "$T/notes/2026-11-05-ajuste-solto.md"
 echo "faz a coisa" > "$T/notes/2026-11-05-chamador-to-beta-.md"
 echo "faz a coisa" > "$T/notes/2026-11-05-chamador-to-beta-um-dois-tres-quatro-cinco-seis-sete-oito-nove-dez-onze.md"
+# Configs do herdr-lane (o $T/sem-config não existe: valem os padrões).
+CF="$T/configs"; mkdir -p "$CF"
+printf '# argv do agente\nnotes_dir = ~/notes\nagent_argv = ["meu-agente"]\nchave_nova=ignorada\n' > "$CF/argv"
+printf 'agent_argv=["meu-agente",1]\n' > "$CF/argv-numero"
+printf 'agent_argv=meu-agente\n' > "$CF/argv-cru"
+cat > "$CF/sem-source" <<EOF
+\$(touch "$T/executou-linha")
+notes_dir=\$(touch "$T/executou-valor")
+\`touch "$T/executou-crase"\`
+agent_argv=["meu-agente"]
+EOF
 # Cópia mínima do repo pro install.sh (o mutante troca só o install.sh dela).
 RC_REPO="$T/repo-copia"
 mkdir -p "$RC_REPO"
@@ -161,12 +172,14 @@ echo '{"status":{"app":"omp","state":"idle"},"turn":0,"name":null,"state":"live"
 
 # run <ls.json> <cwd> <args...>: RC, $C/out (stdout), $C/err (stderr), $C/log
 # (argv do hc/herdr-app). Env do caso: GET=<arquivo em $G> (padrão
-# working.json), START_S, SEND_RC, SPACE, SPACE_RC.
+# working.json), START_S, SEND_RC, SPACE, SPACE_RC, CFG=<config do herdr-lane>
+# (padrão $T/sem-config, que não existe), AGENT_ARGV (vira HERDR_LANE_AGENT_ARGV).
 C="$T/caso"
 run() {
   local agents="$1" cwd="$2"; shift 2
   rm -rf "$C"; mkdir -p "$C"; : > "$C/log"
   ( cd "$cwd" && env HOME="$T" HC_BIN="$T/stub/hc" HERDR_APP_BIN="$T/stub/herdr-app" \
+      HERDR_LANE_CONFIG="${CFG:-$T/sem-config}" HERDR_LANE_AGENT_ARGV="${AGENT_ARGV:-}" \
       STUB_LOG="$C/log" STUB_LS="$A/$agents" STUB_GET="$G/${GET:-working.json}" STUB_GETN="$C/getn" \
       STUB_SEND_RC="${SEND_RC:-0}" STUB_SPACE="${SPACE:-}" STUB_SPACE_RC="${SPACE_RC:-0}" \
       "${LANE_PFX:-HERDR}_LANE_START_S=${START_S:-5}" "${LANE_PFX:-HERDR}_LANE_POLL_S=0" \
@@ -214,10 +227,10 @@ suite() { # $1 script, $2 install.sh; ecoa casos, retorna o número de falhas
   run vazio.json "$CHAMA" "$BETA/a/b/c.txt" --brief "faz z"
   if [ "$RC" = 0 ] \
      && js --arg r "$BETA" '. == {repo_root:$r, workspace_id:"sp9Z", pane:"t9z", agent:"t9z", reused:false}' \
-     && has "[app][do][space.new][--name][beta·de-chamador][--folder][$BETA][--argv][[\"omp-safe\"]][--task][faz z]" \
+     && has "[app][do][space.new][--name][beta·de-chamador][--folder][$BETA][--argv][[\"omp\"]][--task][faz z]" \
      && has "[hc][get][t9z][--json]" && [ "$(nlog '[hc][send]')" = 0 ] \
      && grep -qxF "herdr-lane: beta → t9z (t9z)" "$C/err"; then
-    ok "create-none: space.new com --folder = raiz, --argv [\"omp-safe\"], --task = prompt, label <repo>·de-<lane do chamador>"
+    ok "create-none: space.new com --folder = raiz, --argv [\"omp\"], --task = prompt, label <repo>·de-<lane do chamador>"
   else no create-none "rc=$RC out=$(cat "$C/out") log=$(cat "$C/log") err=$(cat "$C/err")"; fi
 
   run alfa-blocked.json "$CHAMA" "$ALFA" --brief "faz y" --from chamador
@@ -249,7 +262,7 @@ suite() { # $1 script, $2 install.sh; ecoa casos, retorna o número de falhas
 
   run wt-livre.json "$CHAMA" "$WT/x.txt" --brief "faz y" --from chamador
   if [ "$RC" = 0 ] && js --arg r "$WT" '.repo_root == $r and .reused == false and .pane == "t9z"' \
-     && has "[app][do][space.new][--name][alfa-wt·de-chamador][--folder][$WT][--argv][[\"omp-safe\"]][--task][faz y]"; then
+     && has "[app][do][space.new][--name][alfa-wt·de-chamador][--folder][$WT][--argv][[\"omp\"]][--task][faz y]"; then
     ok "wt-livre: worktree linkada sem agente (um shell aberto lá não conta) → space novo na raiz da worktree"
   else no wt-livre "rc=$RC out=$(cat "$C/out") log=$(cat "$C/log")"; fi
 
@@ -375,6 +388,37 @@ suite() { # $1 script, $2 install.sh; ecoa casos, retorna o número de falhas
     ok "env-fallback: BORA_LANE_START_S/POLL_S ainda valem sem as HERDR_LANE_*"
   else no env-fallback "rc=$RC err=$(cat "$C/err")"; fi
 
+  CFG="$CF/argv" run vazio.json "$CHAMA" "$BETA" --brief "faz z" --from chamador
+  if [ "$RC" = 0 ] && has "[app][do][space.new][--name][beta·de-chamador][--folder][$BETA][--argv][[\"meu-agente\"]][--task][faz z]"; then
+    ok "config-argv: agent_argv do config vira o --argv do space.new (espaços e chave desconhecida não atrapalham)"
+  else no config-argv "rc=$RC log=$(cat "$C/log") err=$(cat "$C/err")"; fi
+
+  run vazio.json "$CHAMA" "$BETA" --brief "faz z" --from chamador
+  if [ "$RC" = 0 ] && [ "$(nlog '[--argv][["omp"]]')" = 1 ]; then
+    ok "config-padrao: sem arquivo de config, o --argv é [\"omp\"]"
+  else no config-padrao "rc=$RC log=$(cat "$C/log") err=$(cat "$C/err")"; fi
+
+  local r3 e3 c3
+  CFG="$CF/argv-numero" run vazio.json "$CHAMA" "$BETA" --brief "faz z" --from chamador
+  r3="$RC" e3="$(cat "$C/err")" c3="$(calls)"
+  CFG="$CF/argv-cru" run vazio.json "$CHAMA" "$BETA" --brief "faz z" --from chamador
+  if [ "$r3" = 2 ] && grep -qF "não é um array JSON não vazio de strings" <<<"$e3" && [ "$c3" = 0 ] \
+     && [ "$RC" = 2 ] && grep -qF "agent_argv em $CF/argv-cru" "$C/err" && [ "$(calls)" = 0 ]; then
+    ok "config-invalido: agent_argv que não é array de strings → exit 2 sem falar com o hc, dizendo de onde veio"
+  else no config-invalido "rc1=$r3 err1=$e3 rc=$RC err=$(cat "$C/err") log=$(cat "$C/log")"; fi
+
+  rm -f "$T/executou-linha" "$T/executou-valor" "$T/executou-crase"
+  CFG="$CF/sem-source" run vazio.json "$CHAMA" "$BETA" --brief "faz z" --from chamador
+  if [ "$RC" = 0 ] && [ "$(nlog '[--argv][["meu-agente"]]')" = 1 ] \
+     && [ ! -e "$T/executou-linha" ] && [ ! -e "$T/executou-valor" ] && [ ! -e "$T/executou-crase" ]; then
+    ok "config-sem-source: \$(…) e crase no config não executam (lido linha a linha)"
+  else no config-sem-source "rc=$RC executou=$(ls "$T" | grep executou | paste -sd, -) log=$(cat "$C/log") err=$(cat "$C/err")"; fi
+
+  AGENT_ARGV='["do-env","--x"]' CFG="$CF/argv" run vazio.json "$CHAMA" "$BETA" --brief "faz z" --from chamador
+  if [ "$RC" = 0 ] && [ "$(nlog '[--argv][["do-env","--x"]]')" = 1 ] && [ "$(nlog 'meu-agente')" = 0 ]; then
+    ok "env-vence: HERDR_LANE_AGENT_ARGV vence o agent_argv do config"
+  else no env-vence "rc=$RC log=$(cat "$C/log") err=$(cat "$C/err")"; fi
+
   # install.sh: links globais em pastas da fixture; herdr-app falso no PATH.
   cp "$INST" "$RC_REPO/install.sh"
   local I="$T/inst" ir
@@ -403,20 +447,23 @@ fail=0
 echo "=== script real: $SRC"
 suite "$SRC" || fail=1
 
-mutante() { # $1 nome, $2 descrição, $3 programa sed, $4 alvo (script|install; padrão script)
+mutante() { # $1 nome, $2 descrição, $3 programa sed, $4 alvo (script|install; padrão script), $5 caso que tem que matar (opcional)
   local m="$T/mut-$1" alvo="$SRC"
   [ "${4:-script}" = install ] && alvo="$INST_SRC"
   sed -e "$3" "$alvo" > "$m"
   if cmp -s "$m" "$alvo"; then echo "  FALHOU — mutante '$1' não mudou nada (sed desatualizado)"; fail=1; return; fi
   echo
   echo "=== MUTANTE $1: $2"
-  local n
+  local n por
   if [ "${4:-script}" = install ]; then suite "$SRC" "$m" > "$T/mut-$1.out" 2>&1; n=$?
   else suite "$m" > "$T/mut-$1.out" 2>&1; n=$?; fi
-  if [ "$n" -gt 0 ]; then
-    echo "  ok — morto por $n caso(s): $(sed -n 's/^  FALHOU \[\([^]]*\)\].*/\1/p' "$T/mut-$1.out" | paste -sd, -)"
-  else
+  por="$(sed -n 's/^  FALHOU \[\([^]]*\)\].*/\1/p' "$T/mut-$1.out" | paste -sd, -)"
+  if [ "$n" = 0 ]; then
     echo "  FALHOU — suíte CEGA a este mutante"; fail=1
+  elif [ -n "${5:-}" ] && [[ ",$por," != *",$5,"* ]]; then
+    echo "  FALHOU — morto por $por, mas não por $5"; fail=1
+  else
+    echo "  ok — morto por $n caso(s): $por"
   fi
 }
 mutante busy-ignorado "agente working não recusa" 's/\[ "\$a_status" = working \]/[ "$a_status" = NUNCA ]/'
@@ -425,7 +472,11 @@ mutante linked-como-main "worktree linkada tratada como checkout principal" 's/^
 mutante own-lane-cego "alvo na própria lane é despachado" 's/^if \[ "\$R" = "\$own" \]; then$/if false; then/'
 mutante fora-de-repo "fora de repo vira lane = diretório" 's/|| die2 "fora de qualquer repo git: \$target (ancestral existente: \$dir)"$/|| R="$dir"/'
 mutante sem-folder "space.new sem --folder" 's/ --folder "\$R"//g'
-mutante sem-omp-safe "space.new com omp cru" 's/^argv=.*omp-safe.*$/argv='"'"'["omp"]'"'"'/'
+mutante argv-padrao "sem config, --argv diferente de [\"omp\"]" 's/^argv='"'"'\["omp"\]'"'"' argv_de=padrão$/argv='"'"'["outro"]'"'"' argv_de=padrão/' script config-padrao
+mutante config-ignorado "agent_argv do config é ignorado" 's/^      agent_argv) cfg_argv="\$val" ;;$/      agent_argv) ;;/' script config-argv
+mutante config-sem-validar "agent_argv inválido passa" 's/^  || die2 "argv do agente /  || echo "argv do agente /' script config-invalido
+mutante config-com-source "config também lido com source" 's/^cfg_argv="" notes_dir=""$/cfg_argv="" notes_dir=""; [ ! -f "$CONFIG" ] || . "$CONFIG" 2>\/dev\/null || true/' script config-sem-source
+mutante env-ignorada "HERDR_LANE_AGENT_ARGV não vence o config" 's/^\[ -z "\${HERDR_LANE_AGENT_ARGV:-}" \] || .*$/:/' script env-vence
 mutante label-sem-from "label sem ·de-<from>" 's/^label="\${repo}·\${slug}"$/label="${repo}"/'
 mutante label-sem-slug "label ignora o assunto do brief" 's/^\[ -n "\$slug" \] || slug="de-\${from}"$/slug="de-${from}"/'
 mutante slug-com-data "slug mantém a data do brief" 's/^  slug="\$(sed -E .*$/  :/'

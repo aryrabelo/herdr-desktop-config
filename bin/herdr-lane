@@ -6,9 +6,9 @@
 #
 # Pacote "lane" (2026-11-03): uma sessão omp lê em qualquer lugar mas só
 # escreve no próprio repo (lane = git toplevel do cwd; worktree linkada é
-# lane própria). Quer escrever fora? Escreve o brief em
-# ~/Sites/.agent-notes/ e chama isto: o agente do repo-alvo faz o trabalho,
-# num space visível do Herdr, enraizado na raiz do repo.
+# lane própria). Quer escrever fora? Escreve o brief na pasta de notas
+# (notes_dir do config, abaixo) e chama isto: o agente do repo-alvo faz o
+# trabalho, num space visível do Herdr, enraizado na raiz do repo.
 #
 #   herdr-lane <path> (--brief-file <file> | --brief <text>) [--from <label>] [--dry-run]
 #
@@ -32,10 +32,10 @@
 # Exit 4: o alvo é a lane de quem chamou — nada a rotear, escreva você.
 #
 # Reusa agente idle (antes) ou done com cwd == raiz SÓ em checkout principal
-# (`hc send`); senão `herdr-app do space.new --folder <raiz> --argv
-# '["omp-safe"]' --task <prompt>` (não rouba o foco; a task é a 1ª mensagem
-# do omp, sem corrida de colagem) e espera o turno começar: logo depois do
-# launch o hc diz idle/turn 0 por ~2 s, e um `hc wait` ali voltaria na hora.
+# (`hc send`); senão `herdr-app do space.new --folder <raiz> --argv <agent_argv>
+# --task <prompt>` (não rouba o foco; a task é a 1ª mensagem do agente, sem
+# corrida de colagem) e espera o turno começar: logo depois do launch o hc
+# diz idle/turn 0 por ~2 s, e um `hc wait` ali voltaria na hora.
 # Nome do space novo: <repo>·<slug>. Com --brief-file, slug = basename do
 # brief sem .md, sem a data YYYY-MM-DD- e sem o prefixo <from>-to-<repo>-
 # (até 48 caracteres, cortado num "-"); vazio ou --brief → de-<from>. No
@@ -43,9 +43,17 @@
 # --dry-run só roda o `hc ls --json`/`hc get` (leitura), imprime os comandos.
 # Só LÊ o disco (git rev-parse) e fala com os sockets do hc/herdr-app: roda
 # sob srt.
-# Env: HC_BIN, HERDR_APP_BIN (binários; teste), HERDR_LANE_START_S (espera do
-# início do turno, padrão 90), HERDR_LANE_POLL_S (intervalo, padrão 1). Os
-# nomes antigos BORA_LANE_START_S/BORA_LANE_POLL_S valem como fallback.
+# Config: ${HERDR_LANE_CONFIG:-~/.config/herdr-lane/config}; sem arquivo,
+#   valem os padrões. Linhas chave=valor; linha que começa com # é comentário;
+#   chave desconhecida é ignorada. Lido linha a linha, nunca com source/eval.
+#   agent_argv=["omp"]   argv do agente no space.new: array JSON não vazio de
+#                        strings (padrão ["omp"]; inválido → exit 2).
+#   notes_dir=<pasta>    onde os briefs ficam; só aparece no uso e nos erros.
+# Env: HERDR_LANE_AGENT_ARGV (vence o agent_argv do arquivo; vazia = não
+# definida), HC_BIN, HERDR_APP_BIN (binários; teste), HERDR_LANE_START_S
+# (espera do início do turno, padrão 90), HERDR_LANE_POLL_S (intervalo,
+# padrão 1). Os nomes antigos BORA_LANE_START_S/BORA_LANE_POLL_S valem como
+# fallback.
 # As recusas mantêm o prefixo [repo-lane:...] (a extensão repo-lane.ts do omp
 # depende dele). Detalhe e porquês: README.md, seção herdr-lane.
 set -euo pipefail
@@ -55,13 +63,52 @@ HAPP="${HERDR_APP_BIN:-herdr-app}"
 START_S="${HERDR_LANE_START_S:-${BORA_LANE_START_S:-90}}"
 POLL_S="${HERDR_LANE_POLL_S:-${BORA_LANE_POLL_S:-1}}"
 ME=herdr-lane
+CONFIG="${HERDR_LANE_CONFIG:-$HOME/.config/herdr-lane/config}"
+
+die2() { echo "$ME: $*" >&2; exit 2; }
+die1() { echo "$ME: $*" >&2; exit 1; }
+
+trim() { # $1 sem espaço nas pontas → stdout
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+# Config lido linha a linha: nada do arquivo é executado.
+cfg_argv="" notes_dir=""
+if [ -f "$CONFIG" ]; then
+  [ -r "$CONFIG" ] || die2 "config não legível: $CONFIG"
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="$(trim "${line%$'\r'}")"
+    case "$line" in ''|'#'*) continue ;; esac
+    case "$line" in *=*) ;; *) continue ;; esac
+    key="$(trim "${line%%=*}")"
+    val="$(trim "${line#*=}")"
+    case "$key" in
+      agent_argv) cfg_argv="$val" ;;
+      notes_dir) notes_dir="$val" ;;
+    esac
+  done < "$CONFIG"
+fi
+
+argv='["omp"]' argv_de=padrão
+[ -z "$cfg_argv" ] || { argv="$cfg_argv"; argv_de="agent_argv em $CONFIG"; }
+[ -z "${HERDR_LANE_AGENT_ARGV:-}" ] || { argv="$HERDR_LANE_AGENT_ARGV"; argv_de=HERDR_LANE_AGENT_ARGV; }
+jq -se 'length == 1 and (.[0] | type == "array" and length > 0 and all(.[]; type == "string"))' \
+  <<<"$argv" >/dev/null 2>&1 \
+  || die2 "argv do agente ($argv_de) não é um array JSON não vazio de strings: $argv"
+argv="$(jq -c . <<<"$argv")"
 
 usage() {
   echo "uso: $ME <path> (--brief-file <file> | --brief <text>) [--from <label>] [--dry-run]" >&2
+  if [ -n "$notes_dir" ]; then
+    echo "  brief: $notes_dir/YYYY-MM-DD-<tua lane>-to-<repo>-<slug>.md (notes_dir de $CONFIG)" >&2
+  else
+    echo "  config: $CONFIG (sem notes_dir)" >&2
+  fi
   exit 2
 }
-die2() { echo "$ME: $*" >&2; exit 2; }
-die1() { echo "$ME: $*" >&2; exit 1; }
 
 # Caminho absoluto e real (symlinks resolvidos) do ancestral existente mais
 # próximo. Arquivo vira o diretório dele.
@@ -104,7 +151,9 @@ if [ -n "$brief_file" ]; then
     /*) ;;
     *) brief_file="$PWD/$brief_file" ;;
   esac
-  [ -f "$brief_file" ] && [ -r "$brief_file" ] || die2 "brief não legível: $brief_file"
+  if [ ! -f "$brief_file" ] || [ ! -r "$brief_file" ]; then
+    die2 "brief não legível: $brief_file${notes_dir:+ (os briefs ficam em $notes_dir)}"
+  fi
   brief_file="$(cd "$(dirname "$brief_file")" && pwd -P)/$(basename "$brief_file")"
   prompt="Leia $brief_file e execute"
 else
@@ -163,7 +212,7 @@ done <<<"$rows"
 refuse() { # $1 regra, $2 endereço, $3 nome, $4 status, $5 frase
   jq -nc --arg r "$R" --arg rule "$1" --arg p "$2" --arg a "${3:-$2}" --arg s "$4" \
     '{refused:$rule, repo_root:$r, pane:$p, agent:$a, agent_status:$s}'
-  echo "$ME: [repo-lane:$1] $5 — terminal $2; pergunte ao Ary" >&2
+  echo "$ME: [repo-lane:$1] $5 — terminal $2; pergunte ao humano" >&2
   exit 3
 }
 
@@ -273,7 +322,6 @@ if [ -n "$brief_file" ]; then
 fi
 [ -n "$slug" ] || slug="de-${from}"
 label="${repo}·${slug}"
-argv='["omp-safe"]'
 
 if [ "$dry" = 1 ]; then
   show "$HAPP" do space.new --name "$label" --folder "$R" --argv "$argv" --task "$prompt"

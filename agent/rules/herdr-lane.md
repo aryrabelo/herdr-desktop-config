@@ -9,18 +9,22 @@ Escrita fora da tua lane (raiz git do cwd) falha por design: `EPERM` ou
 `sudo`, symlink, `git -C <outro repo>`, subagente escrevendo por você). Faça:
 
 1. Escreva o brief (o quê, onde, critério de pronto) em
-   `~/Sites/.agent-notes/YYYY-MM-DD-<tua lane>-to-<repo>-<slug>.md`.
+   `<notes_dir>/YYYY-MM-DD-<tua lane>-to-<repo>-<slug>.md`. O `notes_dir` vem do
+   config do herdr-lane (`${HERDR_LANE_CONFIG:-~/.config/herdr-lane/config}`);
+   `herdr-lane --help` mostra a pasta.
 2. `herdr-lane <caminho alvo> --brief-file <brief> --from <tua lane>`
    (`--dry-run` mostra o que faria sem criar nada). Ele abre (ou reaproveita)
-   um agente omp num space do Herdr desktop na raiz daquele repo.
+   um agente (o `agent_argv` do config, padrão `["omp"]`) num space do Herdr
+   desktop na raiz daquele repo.
 3. Pelo exit:
-   - **0**: diga ao Ary em UMA linha o que abriu (repo → agente, `pane` do JSON).
+   - **0**: diga ao humano em UMA linha o que abriu (repo → agente, `pane` do JSON).
    - **3** (agente `working` lá, ou worktree linkada de outra tarefa): pare e
-     pergunte ao Ary, nomeando o `pane` do JSON.
+     pergunte ao humano, nomeando o `pane` do JSON.
    - **4**: o alvo é a tua lane; escreva você.
-   - **2**: uso errado ou caminho fora de repo git; corrija ou pergunte.
+   - **2**: uso errado, caminho fora de repo git ou `agent_argv` inválido no
+     config; corrija ou pergunte.
    - **1**: o hc/herdr-app falhou ou o agente não começou; a mensagem nomeia
-     space e terminal (o space fica aberto). Mostre ao Ary.
+     space e terminal (o space fica aberto). Mostre ao humano.
 4. Acompanhe com `hc wait <agent> --timeout 3600` num bash com `async: true`.
    `"reason":"timeout"` é só check-in: rode de novo. Outro reason = o agente
    parou (done/idle/blocked/exited).
@@ -32,4 +36,4 @@ Escrita fora da tua lane (raiz git do cwd) falha por design: `EPERM` ou
    sem o `<lane>-to-<repo>-`). Escolha um slug que diga o assunto.
 
 `bora-lane` é o nome antigo (alias por algumas semanas). Script e porquês:
-`~/Sites/personal-team/herdr-desktop-config` (`bin/herdr-lane`, README).
+`bin/herdr-lane` e o README do repo herdr-desktop-config.
