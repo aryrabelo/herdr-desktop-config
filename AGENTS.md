@@ -10,10 +10,12 @@ Repo público: nada de token, host privado ou nome de cliente.
   pasta linkada). Editar = editar aqui e `just update`; ou editar em
   `~/.config/herdr-app/mods/<nome>/` para testar e trazer de volta para cá.
 - `herdr-app check <pasta do mod>` grava `jsconfig.json` e `gpui-kit.d.ts` na
-  pasta. Rodando sobre o repo, apague os dois antes de commitar.
+  pasta; em `mods/*/` o `.gitignore` já os ignora.
 - Uma sessão omp não grava em `~/.config` (fora da lane). Monte o comando
   (`just dry-run` primeiro) e entregue ao humano.
-- `just test`: lógica pura dos mods e o `herdr-lane`.
+- Rode `just test` antes de dizer que terminou: lógica do `pane-head` e do
+  patch de PR do `space-folders`, `herdr-lane` com mutantes e um install numa
+  config falsa. Documentação não é testada.
 
 ## session-status (barra de baixo do `ary`)
 
@@ -46,14 +48,11 @@ título da sessão, pasta, space/tab e os comandos `hc send|read|wait <endereço
 
 ## space-folders
 
-Pastas em `~/.config/herdr-space-folders.json` (formato no README). `at` precisa
-subir para o mod aceitar o arquivo. `space-folders.next`/`prev` (⌘⌥] / ⌘⌥[)
-seguem a ordem das pastas e pulam pasta dobrada; o mod não expõe comando que
-mude pasta.
+Pastas em `~/.config/herdr-space-folders.json`; formato, o `at` que precisa
+subir e o `bin/auto-pastas.sh` estão no README. Os únicos comandos do mod
+são `space-folders.next`/`prev` (navegar); nenhum muda a pasta de um space.
 
-## App aberto de um pane morre quando o pane fecha
+## App GUI aberto de um pane
 
-O `open` repassa ao app o ambiente do shell, inclusive `HC_TERMINAL_ID`, e o
-Herdr manda SIGHUP a todo processo com aquele id quando o terminal fecha, mesmo
-fora da árvore do pane. App GUI aberto de um pane vai com
-`env -i HOME="$HOME" /usr/bin/open …`.
+Vai com `env -i HOME="$HOME" /usr/bin/open …`, senão morre quando o pane fecha
+(porquê no README, "Armadilha").

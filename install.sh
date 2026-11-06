@@ -151,5 +151,5 @@ if [ "$DRY" = 1 ]; then
 else
   [ -d "$BACKUP" ] && echo "backup: $BACKUP"
   echo "ok. Layout: herdr-app do layout.switch --name ary (ou cmd-shift-l)."
-  echo "Pastas por projeto: edite e rode space-folders/auto-pastas.sh --dry-run"
+  echo "Pastas por projeto: edite e rode bin/auto-pastas.sh --dry-run"
 fi

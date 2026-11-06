@@ -1,8 +1,9 @@
 # herdr-desktop-config
 
-Como eu configuro o [Herdr](https://herdr.dev) desktop no Mac: atalhos, layouts,
-um mod próprio para pular para o agente que precisa de mim e a sidebar
-organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
+Como eu configuro o [Herdr](https://herdr.dev) desktop no Mac: atalhos, um
+layout, mods próprios (pular para o agente que precisa de mim, barra de baixo
+com o resumo da sessão, menu do terminal) e a sidebar organizada em pastas.
+Dá para reproduzir tudo na sua máquina com um comando.
 
 ## As peças
 
@@ -10,35 +11,89 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 |---|---|---|
 | atalhos | `config/keys.json` | atalhos globais, de terminal e a seção `layout:ary` (⌘⌥] / ⌘⌥[ e ⌥⇧⌘] / ⌥⇧⌘[) |
 | settings | `config/settings.json` | zoom 0.9, tema escuro, sons ligados |
-| layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar em pastas (`space-folders`), a barra de baixo `session-status` e o menu de terminal `ary-menu` |
+| layout `ary` | `config/layouts/ary.json` | cópia do layout `main` do Herdr com a sidebar em pastas (`space-folders`), a barra de baixo `session-status` e o menu de terminal `ary-menu` |
 | mod `next-needed` | `mods/next-needed/` | ⌘J foca o próximo agente que precisa de você |
 | mod `session-status` | `mods/session-status/` | barra de baixo: o que o `workspace-status` mostra mais o resumo da sessão do agente em foco; passeio de agentes por prioridade (⌥⇧⌘] / ⌥⇧⌘[) |
 | mod `ary-menu` | `mods/ary-menu/` | menu do botão direito no terminal: o `menu` do Herdr 0.1.13 com **Copy pane info** |
 | mod `pane-head` | `mods/pane-head/` | opcional, instalado mas fora do layout: cabeçalho do pane com o nome do agente e o endereço no hc (`t2y`). Para usar, troque `"mod": "pane"` por `"mod": "pane-head"` no `ary.json` |
 | mod `html-viewer` | não está no repo | abre `.html`/`.md` numa aba (veja "html-viewer" abaixo) |
-| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja abaixo) |
-| pastas automáticas | `space-folders/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
+| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com os arquivos de licença que vieram com ele e um patch nosso: o estado do PR da branch na linha do space (veja "Estado do PR na linha do space") |
+| pastas automáticas | `bin/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
+| instalador | `install.sh` + `justfile` | instala tudo acima (veja "Instalar") |
+| testes | `test/` | `just test`: lógica do `pane-head` e do patch de PR do `space-folders`, `herdr-lane` e um install numa config falsa |
 
-### Estado do PR na linha do space
+## Instalar
 
-Cada space numa branch que não é `main`/`master` mostra o PR dela, lido com
-`gh pr view --json number,state,isDraft,statusCheckRollup` na pasta do space:
-o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
+Pré-requisitos: Herdr desktop com `herdr-app` no PATH e, para as pastas
+automáticas, `jq`. O `html-viewer` precisa de `git` e rede (sem eles o resto instala).
 
-| estado | cor | sinal |
-|---|---|---|
-| merged | roxo forte (`#b16cff`) | `✓` |
-| aberto, checks rodando | amarelo forte (`#ffc400`) | `●` |
-| aberto, checks verdes | verde forte (`#22e05a`) | `✓` |
-| aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
-| draft | apagado (`dim`) | `◌` |
-| fechado | vermelho | `×` |
+```bash
+git clone https://github.com/aryrabelo/herdr-desktop-config.git
+cd herdr-desktop-config
+bash install.sh --dry-run   # mostra o que faria
+bash install.sh             # instala
+```
 
-Sem PR, nada muda (ícone cinza). Cache por repo e branch, uma chamada ao `gh`
-por vez e só com a janela em frente: checks rodando a cada 1 min, aberto a cada
-3, sem PR a cada 5, merged/fechado a cada 30. O `gh` precisa estar logado na
-conta dona do repo.
+O `install.sh`:
+
+1. faz backup do que vai sobrescrever em `~/.config/herdr-app/backup-<data>/`;
+2. copia `keys.json`, `settings.json` e o layout `ary` (apaga antes o
+   destino, então um symlink do home-manager é trocado por arquivo);
+3. copia os mods `next-needed`, `session-status`, `ary-menu`, `pane-head` e
+   `space-folders` de `mods/` — **cópia, nunca symlink**: o Herdr não percebe
+   mudança dentro de pasta de mod linkada;
+4. baixa o `html-viewer` (veja abaixo) e copia o mod dele;
+5. roda `herdr-app check` em cada mod;
+6. cria os links globais do `herdr-lane` (veja "Links globais").
+
+Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
+
+Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
+estiver no repo (é o `install.sh`), `just dry-run` só mostra e `just test`
+roda os testes: a lógica pura do `pane-head` e do patch do `space-folders`, e
+que o `next-needed` carrega (`test/mods-test.mjs`), o `herdr-lane`
+com mutantes (`test/herdr-lane-test.sh`) e o `install.sh` numa config falsa
+(`test/install-smoke.sh`).
+
+Depois, ⌘⇧L e escolha `ary`.
+
+O layout `main-folders` saiu: o `ary` já usa o `space-folders`, e dois layouts
+iguais só davam dois lugares para manter. Quem tinha `main-folders.json`
+instalado fica com o arquivo antigo; pode apagá-lo.
+
+Editar um mod: edite aqui e rode `just update` (ou edite em
+`~/.config/herdr-app/mods/` e traga de volta). Mais em `AGENTS.md`.
+
+### html-viewer
+
+[frizynn/html-viewer](https://github.com/frizynn/html-viewer) abre `.html` ou
+`.md` numa aba: um Chrome headless desenha a página (com JS) e a aba recebe a
+imagem, só leitura. Precisa de Node 22+ e Chrome.
+
+```bash
+herdr-app do tab.new '{"mod":"html-viewer","props":{"file":"~/x.html"}}'
+```
+
+O upstream não tem licença, então ele **não é redistribuído** aqui: o
+`install.sh` clona o commit `84f56798735fc59be467cd9f3942e98f257d3908` em
+`${XDG_CACHE_HOME:-~/.cache}/herdr-desktop-config/` e copia o mod de lá. Sem
+rede, avisa e segue.
+
+## Atalhos que importam
+
+| atalho | ação |
+|---|---|
+| ⌘J | pula para o próximo agente que precisa de você: primeiro os `blocked`, depois os `done`; apertar de novo passa para o seguinte |
+| ⌘⌥[ / ⌘⌥] | space anterior / próximo **na ordem das pastas** (pula pasta dobrada) |
+| ⌥⇧⌘[ / ⌥⇧⌘] | agente anterior / próximo por prioridade: blocked > done > idle > working |
+| ⌘⇧L | troca de layout (`layout.switch`) |
+| ⌘[ / ⌘] | agente anterior / próximo |
+| ⌘B | mostra/esconde a sidebar |
+| ⌘D / ⌘⇧D | divide o pane à direita / abaixo |
+| ⌘W / ⌘⇧W | fecha o pane / a tab |
+
+O resto está em `config/keys.json`.
 
 ## A sidebar com pastas
 
@@ -68,82 +123,34 @@ conta dona do repo.
 Cada space cai na pasta cuja regra (`match`) casa com a pasta onde o terminal
 dele está agora. Arrastar um space para uma pasta vence qualquer regra.
 
-## Atalhos que importam
+### Estado do PR na linha do space
 
-| atalho | ação |
-|---|---|
-| ⌘J | pula para o próximo agente que precisa de você: primeiro os `blocked`, depois os `done`; apertar de novo passa para o seguinte |
-| ⌘⌥[ / ⌘⌥] | space anterior / próximo **na ordem das pastas** (pula pasta dobrada) |
-| ⌥⇧⌘[ / ⌥⇧⌘] | agente anterior / próximo por prioridade: blocked > done > idle > working |
-| ⌘⇧L | troca de layout (`layout.switch`) |
-| ⌘[ / ⌘] | agente anterior / próximo |
-| ⌘B | mostra/esconde a sidebar |
-| ⌘D / ⌘⇧D | divide o pane à direita / abaixo |
-| ⌘W / ⌘⇧W | fecha o pane / a tab |
+Cada space numa branch que não é `main`/`master` mostra o PR dela, lido com
+`gh pr view --json number,state,isDraft,statusCheckRollup` na pasta do space:
+o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
 
-O resto está em `config/keys.json`.
+| estado | cor | sinal |
+|---|---|---|
+| merged | roxo forte (`#b16cff`) | `✓` |
+| aberto, checks rodando | amarelo forte (`#ffc400`) | `●` |
+| aberto, checks verdes | verde forte (`#22e05a`) | `✓` |
+| aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
+| draft | apagado (`dim`) | `◌` |
+| fechado | vermelho | `×` |
 
-## Instalar
+Sem PR, nada muda (ícone cinza). Cache por repo e branch, uma chamada ao `gh`
+por vez e só com a janela em frente: checks rodando a cada 1 min, aberto a cada
+3, sem PR a cada 5, merged/fechado a cada 30. O `gh` precisa estar logado na
+conta dona do repo.
 
-Pré-requisitos: Herdr desktop com `herdr-app` no PATH e, para as pastas
-automáticas, `jq`. O `html-viewer` precisa de `git` e rede (sem eles o resto instala).
+### Pastas automáticas
 
-```bash
-git clone https://github.com/aryrabelo/herdr-desktop-config.git
-cd herdr-desktop-config
-bash install.sh --dry-run   # mostra o que faria
-bash install.sh             # instala
-```
-
-O `install.sh`:
-
-1. faz backup do que vai sobrescrever em `~/.config/herdr-app/backup-<data>/`;
-2. copia `keys.json`, `settings.json` e o layout `ary` (apaga antes o
-   destino, então um symlink do home-manager é trocado por arquivo);
-3. copia os mods `next-needed`, `session-status`, `ary-menu`, `pane-head` e
-   `space-folders` de `mods/` — **cópia, nunca symlink**: o Herdr não percebe
-   mudança dentro de pasta de mod linkada;
-4. baixa o `html-viewer` (veja abaixo) e copia o mod dele;
-5. roda `herdr-app check` em cada mod.
-
-Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
-
-Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
-estiver no repo (é o `install.sh`), `just dry-run` só mostra e `just test`
-roda o teste do `herdr-lane`.
-
-Depois, ⌘⇧L e escolha `ary`.
-
-O layout `main-folders` saiu: o `ary` já usa o `space-folders`, e dois layouts
-iguais só davam dois lugares para manter. Quem tinha `main-folders.json`
-instalado fica com o arquivo antigo; pode apagá-lo.
-
-Editar um mod: edite aqui e rode `just update` (ou edite em
-`~/.config/herdr-app/mods/` e traga de volta). Mais em `AGENTS.md`.
-
-### html-viewer
-
-[frizynn/html-viewer](https://github.com/frizynn/html-viewer) abre `.html` ou
-`.md` numa aba: um Chrome headless desenha a página (com JS) e a aba recebe a
-imagem, só leitura. Precisa de Node 22+ e Chrome.
-
-```bash
-herdr-app do tab.new '{"mod":"html-viewer","props":{"file":"~/x.html"}}'
-```
-
-O upstream não tem licença, então ele **não é redistribuído** aqui: o
-`install.sh` clona o commit `84f56798735fc59be467cd9f3942e98f257d3908` em
-`${XDG_CACHE_HOME:-~/.cache}/herdr-desktop-config/` e copia o mod de lá. Sem
-rede, avisa e segue.
-
-## Pastas automáticas
-
-Edite a lista `NEW` em `space-folders/auto-pastas.sh` (nome, cor, pasta de
+Edite a lista `NEW` em `bin/auto-pastas.sh` (nome, cor, pasta de
 início e regra) e rode:
 
 ```bash
-bash space-folders/auto-pastas.sh --dry-run
-bash space-folders/auto-pastas.sh
+bash bin/auto-pastas.sh --dry-run
+bash bin/auto-pastas.sh
 ```
 
 O script só acrescenta pastas que faltam (compara nome sem acento nem caixa)
@@ -175,22 +182,6 @@ Formato desse arquivo:
 O mod relê o arquivo em até 15 s. Pela tela: botão direito na pasta (cor,
 **Edit folder…**, **Delete**), arraste spaces para dentro ou para a faixa
 tracejada, arraste pastas para reordenar.
-
-## Voltar ao padrão
-
-```bash
-herdr-app do layout.switch --name main
-```
-
-Isso volta para a sidebar original do Herdr. Para desfazer tudo, copie de
-volta os arquivos de `~/.config/herdr-app/backup-<data>/` e apague
-`~/.config/herdr-app/mods/next-needed` e `mods/space-folders`.
-
-## Armadilha: app aberto de um pane morre quando o pane fecha
-
-O Herdr manda SIGHUP para todo processo com o `HC_TERMINAL_ID` do terminal que
-fecha, e o `open` repassa esse ambiente ao app. App GUI aberto de dentro de um
-pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
 
 ## herdr-lane
 
@@ -278,9 +269,31 @@ Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais numa fixture em
 `${TMPDIR:-/tmp}` com `mktemp -d`, config do herdr-lane da fixture, nunca o
 real, e um mutante por ramo, morto pelo nome).
 
+## Armadilha: app aberto de um pane morre quando o pane fecha
+
+O Herdr manda SIGHUP para todo processo com o `HC_TERMINAL_ID` do terminal que
+fecha, mesmo fora da árvore do pane, e o `open` repassa esse ambiente ao app.
+App GUI aberto de dentro de um pane deve ir com
+`env -i HOME="$HOME" /usr/bin/open …`.
+
+## Voltar ao padrão
+
+```bash
+herdr-app do layout.switch --name main
+```
+
+Isso volta para a sidebar original do Herdr. Para desfazer tudo, apague
+`~/.config/herdr-app/layouts/ary.json`, em `~/.config/herdr-app/mods/` as
+pastas `next-needed`, `session-status`, `ary-menu`, `pane-head`,
+`space-folders` e `html-viewer`, os links `~/.local/bin/herdr-lane`,
+`~/.local/bin/bora-lane` e `~/.omp/agent/rules/herdr-lane.md`, e depois copie
+de volta o que existia antes, guardado em `~/.config/herdr-app/backup-<data>/`
+(os links antigos ficam em `backup-<data>/global/`).
+
 ## Licença
 
 MIT (`LICENSE`). O `mods/space-folders/` é de Jankees van Woezik, também MIT,
-redistribuído com o `LICENSE` original dentro da pasta e um patch nosso (estado
-do PR), marcado no código. `mods/pane-head/` e `mods/ary-menu/` partem dos mods
-`pane` e `menu` que vêm com o Herdr. O `html-viewer` não é redistribuído.
+redistribuído com os arquivos de licença que vieram com ele (`LICENSE`, MIT, e
+`LICENSE-APACHE`) dentro da pasta e um patch nosso (estado do PR), marcado no
+código. `mods/pane-head/` e `mods/ary-menu/` partem dos mods `pane` e `menu`
+que vêm com o Herdr. O `html-viewer` não é redistribuído.

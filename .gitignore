@@ -2,3 +2,6 @@ backup-*/
 .DS_Store
 *.bak-*
 .unlazy/
+# `herdr-app check <pasta do mod>` grava estes dois na pasta
+mods/*/jsconfig.json
+mods/*/gpui-kit.d.ts
