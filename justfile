@@ -1,4 +1,5 @@
 # Aplica a config deste repo no Herdr desktop (~/.config/herdr-app, ou $HERDR_APP_DIR).
+# Lista as receitas
 default:
     @just --list
 
