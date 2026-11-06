@@ -14,8 +14,8 @@ Repo público: nada de token, host privado ou nome de cliente.
 - Uma sessão omp não grava em `~/.config` (fora da lane). Monte o comando
   (`just dry-run` primeiro) e entregue ao humano.
 - Rode `just test` antes de dizer que terminou: lógica do `pane-head` e do
-  `space-folders`, `herdr-lane` com mutantes e um install numa config falsa.
-  Documentação não é testada.
+  patch de PR do `space-folders`, `herdr-lane` com mutantes e um install numa
+  config falsa. Documentação não é testada.
 
 ## session-status (barra de baixo do `ary`)
 

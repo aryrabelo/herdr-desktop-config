@@ -21,7 +21,7 @@ Dá para reproduzir tudo na sua máquina com um comando.
 | pastas automáticas | `bin/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
 | instalador | `install.sh` + `justfile` | instala tudo acima (veja "Instalar") |
-| testes | `test/` | `just test`: lógica do `pane-head` e do `space-folders`, `herdr-lane` e um install numa config falsa |
+| testes | `test/` | `just test`: lógica do `pane-head` e do patch de PR do `space-folders`, `herdr-lane` e um install numa config falsa |
 
 ## Instalar
 
@@ -294,6 +294,6 @@ de volta o que existia antes, guardado em `~/.config/herdr-app/backup-<data>/`
 
 MIT (`LICENSE`). O `mods/space-folders/` é de Jankees van Woezik, também MIT,
 redistribuído com os arquivos de licença que vieram com ele (`LICENSE`, MIT, e
-`LICENSE-APACHE`) dentro da pasta e um patch nosso (estado
-do PR), marcado no código. `mods/pane-head/` e `mods/ary-menu/` partem dos mods
-`pane` e `menu` que vêm com o Herdr. O `html-viewer` não é redistribuído.
+`LICENSE-APACHE`) dentro da pasta e um patch nosso (estado do PR), marcado no
+código. `mods/pane-head/` e `mods/ary-menu/` partem dos mods `pane` e `menu`
+que vêm com o Herdr. O `html-viewer` não é redistribuído.
