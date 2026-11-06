@@ -17,7 +17,7 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 | mod `pane-head` | `mods/pane-head/` | opcional, instalado mas fora do layout: cabeçalho do pane com o nome do agente e o endereço no hc (`t2y`). Para usar, troque `"mod": "pane"` por `"mod": "pane-head"` no `ary.json` |
 | mod `html-viewer` | não está no repo | abre `.html`/`.md` numa aba (veja "html-viewer" abaixo) |
 | mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja abaixo) |
-| pastas automáticas | `space-folders/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
+| pastas automáticas | `bin/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
 
 ### Estado do PR na linha do space
@@ -138,12 +138,12 @@ rede, avisa e segue.
 
 ## Pastas automáticas
 
-Edite a lista `NEW` em `space-folders/auto-pastas.sh` (nome, cor, pasta de
+Edite a lista `NEW` em `bin/auto-pastas.sh` (nome, cor, pasta de
 início e regra) e rode:
 
 ```bash
-bash space-folders/auto-pastas.sh --dry-run
-bash space-folders/auto-pastas.sh
+bash bin/auto-pastas.sh --dry-run
+bash bin/auto-pastas.sh
 ```
 
 O script só acrescenta pastas que faltam (compara nome sem acento nem caixa)

@@ -6,8 +6,8 @@
 # Só ACRESCENTA pastas cujo nome ainda não existe; nas que já existem, completa
 # só regra, pasta de início e cor que estiverem faltando.
 # O mod relê o arquivo em até 15 s (vence o "at" mais novo).
-#   ./auto-pastas.sh            aplica
-#   ./auto-pastas.sh --dry-run  só mostra o resultado
+#   bash bin/auto-pastas.sh            aplica
+#   bash bin/auto-pastas.sh --dry-run  só mostra o resultado
 set -euo pipefail
 
 FILE="$HOME/.config/herdr-space-folders.json"
