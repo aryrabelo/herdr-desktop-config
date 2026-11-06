@@ -16,74 +16,11 @@ com o resumo da sessão, menu do terminal) e a sidebar organizada em pastas. Dá
 | mod `ary-menu` | `mods/ary-menu/` | menu do botão direito no terminal: o `menu` do Herdr 0.1.13 com **Copy pane info** |
 | mod `pane-head` | `mods/pane-head/` | opcional, instalado mas fora do layout: cabeçalho do pane com o nome do agente e o endereço no hc (`t2y`). Para usar, troque `"mod": "pane"` por `"mod": "pane-head"` no `ary.json` |
 | mod `html-viewer` | não está no repo | abre `.html`/`.md` numa aba (veja "html-viewer" abaixo) |
-| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja abaixo) |
+| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja "Estado do PR na linha do space") |
 | pastas automáticas | `bin/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
 | instalador | `install.sh` + `justfile` | instala tudo acima (veja "Instalar") |
 | testes | `test/` | `just test`: lógica dos mods, `herdr-lane` e um install numa config falsa |
-
-### Estado do PR na linha do space
-
-Cada space numa branch que não é `main`/`master` mostra o PR dela, lido com
-`gh pr view --json number,state,isDraft,statusCheckRollup` na pasta do space:
-o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
-
-| estado | cor | sinal |
-|---|---|---|
-| merged | roxo forte (`#b16cff`) | `✓` |
-| aberto, checks rodando | amarelo forte (`#ffc400`) | `●` |
-| aberto, checks verdes | verde forte (`#22e05a`) | `✓` |
-| aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
-| draft | apagado (`dim`) | `◌` |
-| fechado | vermelho | `×` |
-
-Sem PR, nada muda (ícone cinza). Cache por repo e branch, uma chamada ao `gh`
-por vez e só com a janela em frente: checks rodando a cada 1 min, aberto a cada
-3, sem PR a cada 5, merged/fechado a cada 30. O `gh` precisa estar logado na
-conta dona do repo.
-
-## A sidebar com pastas
-
-```
-┌──────────────────────────┬────────────────────────────────────────┐
-│ ● ● ●   workspace        │ tab 1 │ tab 2 │ tab 3                   │
-├──────────────────────────┤────────────────────────────────────────┤
-│ ▾ Trabalho          (3)  │                                        │
-│     api                  │                                        │
-│     web            ●     │          pane do terminal              │
-│     infra                │                                        │
-│ ▾ Cliente A         (1)  │                                        │
-│     landing              │                                        │
-│ ▸ Pessoal           (4)  │  ← pasta fechada                       │
-│ ▾ Avulso                 │                                        │
-│     scratch              │                                        │
-│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │  ← solte aqui para tirar da pasta      │
-├──────────────────────────┤                                        │
-│ AGENTS                   │                                        │
-│   claude · web  blocked  │                                        │
-│   codex  · api  done     │                                        │
-├──────────────────────────┤────────────────────────────────────────┤
-│ footer                   │ status                                 │
-└──────────────────────────┴────────────────────────────────────────┘
-```
-
-Cada space cai na pasta cuja regra (`match`) casa com a pasta onde o terminal
-dele está agora. Arrastar um space para uma pasta vence qualquer regra.
-
-## Atalhos que importam
-
-| atalho | ação |
-|---|---|
-| ⌘J | pula para o próximo agente que precisa de você: primeiro os `blocked`, depois os `done`; apertar de novo passa para o seguinte |
-| ⌘⌥[ / ⌘⌥] | space anterior / próximo **na ordem das pastas** (pula pasta dobrada) |
-| ⌥⇧⌘[ / ⌥⇧⌘] | agente anterior / próximo por prioridade: blocked > done > idle > working |
-| ⌘⇧L | troca de layout (`layout.switch`) |
-| ⌘[ / ⌘] | agente anterior / próximo |
-| ⌘B | mostra/esconde a sidebar |
-| ⌘D / ⌘⇧D | divide o pane à direita / abaixo |
-| ⌘W / ⌘⇧W | fecha o pane / a tab |
-
-O resto está em `config/keys.json`.
 
 ## Instalar
 
@@ -141,7 +78,70 @@ O upstream não tem licença, então ele **não é redistribuído** aqui: o
 `${XDG_CACHE_HOME:-~/.cache}/herdr-desktop-config/` e copia o mod de lá. Sem
 rede, avisa e segue.
 
-## Pastas automáticas
+## Atalhos que importam
+
+| atalho | ação |
+|---|---|
+| ⌘J | pula para o próximo agente que precisa de você: primeiro os `blocked`, depois os `done`; apertar de novo passa para o seguinte |
+| ⌘⌥[ / ⌘⌥] | space anterior / próximo **na ordem das pastas** (pula pasta dobrada) |
+| ⌥⇧⌘[ / ⌥⇧⌘] | agente anterior / próximo por prioridade: blocked > done > idle > working |
+| ⌘⇧L | troca de layout (`layout.switch`) |
+| ⌘[ / ⌘] | agente anterior / próximo |
+| ⌘B | mostra/esconde a sidebar |
+| ⌘D / ⌘⇧D | divide o pane à direita / abaixo |
+| ⌘W / ⌘⇧W | fecha o pane / a tab |
+
+O resto está em `config/keys.json`.
+
+## A sidebar com pastas
+
+```
+┌──────────────────────────┬────────────────────────────────────────┐
+│ ● ● ●   workspace        │ tab 1 │ tab 2 │ tab 3                   │
+├──────────────────────────┤────────────────────────────────────────┤
+│ ▾ Trabalho          (3)  │                                        │
+│     api                  │                                        │
+│     web            ●     │          pane do terminal              │
+│     infra                │                                        │
+│ ▾ Cliente A         (1)  │                                        │
+│     landing              │                                        │
+│ ▸ Pessoal           (4)  │  ← pasta fechada                       │
+│ ▾ Avulso                 │                                        │
+│     scratch              │                                        │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │  ← solte aqui para tirar da pasta      │
+├──────────────────────────┤                                        │
+│ AGENTS                   │                                        │
+│   claude · web  blocked  │                                        │
+│   codex  · api  done     │                                        │
+├──────────────────────────┤────────────────────────────────────────┤
+│ footer                   │ status                                 │
+└──────────────────────────┴────────────────────────────────────────┘
+```
+
+Cada space cai na pasta cuja regra (`match`) casa com a pasta onde o terminal
+dele está agora. Arrastar um space para uma pasta vence qualquer regra.
+
+### Estado do PR na linha do space
+
+Cada space numa branch que não é `main`/`master` mostra o PR dela, lido com
+`gh pr view --json number,state,isDraft,statusCheckRollup` na pasta do space:
+o ícone de branch (worktree) ganha a cor e o fim da linha ganha `✓ #108`.
+
+| estado | cor | sinal |
+|---|---|---|
+| merged | roxo forte (`#b16cff`) | `✓` |
+| aberto, checks rodando | amarelo forte (`#ffc400`) | `●` |
+| aberto, checks verdes | verde forte (`#22e05a`) | `✓` |
+| aberto, algum check falhou | vermelho (`ansi1`) | `✗` |
+| draft | apagado (`dim`) | `◌` |
+| fechado | vermelho | `×` |
+
+Sem PR, nada muda (ícone cinza). Cache por repo e branch, uma chamada ao `gh`
+por vez e só com a janela em frente: checks rodando a cada 1 min, aberto a cada
+3, sem PR a cada 5, merged/fechado a cada 30. O `gh` precisa estar logado na
+conta dona do repo.
+
+### Pastas automáticas
 
 Edite a lista `NEW` em `bin/auto-pastas.sh` (nome, cor, pasta de
 início e regra) e rode:
@@ -180,25 +180,6 @@ Formato desse arquivo:
 O mod relê o arquivo em até 15 s. Pela tela: botão direito na pasta (cor,
 **Edit folder…**, **Delete**), arraste spaces para dentro ou para a faixa
 tracejada, arraste pastas para reordenar.
-
-## Voltar ao padrão
-
-```bash
-herdr-app do layout.switch --name main
-```
-
-Isso volta para a sidebar original do Herdr. Para desfazer tudo, apague em
-`~/.config/herdr-app/mods/` as pastas `next-needed`, `session-status`,
-`ary-menu`, `pane-head`, `space-folders` e `html-viewer`, os links
-`~/.local/bin/herdr-lane`, `~/.local/bin/bora-lane` e
-`~/.omp/agent/rules/herdr-lane.md`, e depois copie de volta o que existia
-antes, guardado em `~/.config/herdr-app/backup-<data>/`.
-
-## Armadilha: app aberto de um pane morre quando o pane fecha
-
-O Herdr manda SIGHUP para todo processo com o `HC_TERMINAL_ID` do terminal que
-fecha, e o `open` repassa esse ambiente ao app. App GUI aberto de dentro de um
-pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
 
 ## herdr-lane
 
@@ -285,6 +266,25 @@ avisado e pulado. As pastas mudam com `HERDR_LANE_BIN_DIR` e
 Teste: `just test` (`hc` e `herdr-app` falsos, repos git reais numa fixture em
 `${TMPDIR:-/tmp}` com `mktemp -d`, config do herdr-lane da fixture, nunca o
 real, e um mutante por ramo, morto pelo nome).
+
+## Armadilha: app aberto de um pane morre quando o pane fecha
+
+O Herdr manda SIGHUP para todo processo com o `HC_TERMINAL_ID` do terminal que
+fecha, e o `open` repassa esse ambiente ao app. App GUI aberto de dentro de um
+pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
+
+## Voltar ao padrão
+
+```bash
+herdr-app do layout.switch --name main
+```
+
+Isso volta para a sidebar original do Herdr. Para desfazer tudo, apague em
+`~/.config/herdr-app/mods/` as pastas `next-needed`, `session-status`,
+`ary-menu`, `pane-head`, `space-folders` e `html-viewer`, os links
+`~/.local/bin/herdr-lane`, `~/.local/bin/bora-lane` e
+`~/.omp/agent/rules/herdr-lane.md`, e depois copie de volta o que existia
+antes, guardado em `~/.config/herdr-app/backup-<data>/`.
 
 ## Licença
 
