@@ -10,7 +10,7 @@ Repo público: nada de token, host privado ou nome de cliente.
   pasta linkada). Editar = editar aqui e `just update`; ou editar em
   `~/.config/herdr-app/mods/<nome>/` para testar e trazer de volta para cá.
 - `herdr-app check <pasta do mod>` grava `jsconfig.json` e `gpui-kit.d.ts` na
-  pasta. Rodando sobre o repo, apague os dois antes de commitar.
+  pasta; em `mods/*/` o `.gitignore` já os ignora.
 - Uma sessão omp não grava em `~/.config` (fora da lane). Monte o comando
   (`just dry-run` primeiro) e entregue ao humano.
 - `just test`: lógica pura dos mods e o `herdr-lane`.
