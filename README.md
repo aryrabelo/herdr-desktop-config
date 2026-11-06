@@ -2,7 +2,8 @@
 
 Como eu configuro o [Herdr](https://herdr.dev) desktop no Mac: atalhos, um
 layout, mods próprios (pular para o agente que precisa de mim, barra de baixo
-com o resumo da sessão, menu do terminal) e a sidebar organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
+com o resumo da sessão, menu do terminal) e a sidebar organizada em pastas.
+Dá para reproduzir tudo na sua máquina com um comando.
 
 ## As peças
 
@@ -16,11 +17,11 @@ com o resumo da sessão, menu do terminal) e a sidebar organizada em pastas. Dá
 | mod `ary-menu` | `mods/ary-menu/` | menu do botão direito no terminal: o `menu` do Herdr 0.1.13 com **Copy pane info** |
 | mod `pane-head` | `mods/pane-head/` | opcional, instalado mas fora do layout: cabeçalho do pane com o nome do agente e o endereço no hc (`t2y`). Para usar, troque `"mod": "pane"` por `"mod": "pane-head"` no `ary.json` |
 | mod `html-viewer` | não está no repo | abre `.html`/`.md` numa aba (veja "html-viewer" abaixo) |
-| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja "Estado do PR na linha do space") |
+| mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com os arquivos de licença que vieram com ele e um patch nosso: o estado do PR da branch na linha do space (veja "Estado do PR na linha do space") |
 | pastas automáticas | `bin/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
 | instalador | `install.sh` + `justfile` | instala tudo acima (veja "Instalar") |
-| testes | `test/` | `just test`: lógica dos mods, `herdr-lane` e um install numa config falsa |
+| testes | `test/` | `just test`: lógica do `pane-head` e do `space-folders`, `herdr-lane` e um install numa config falsa |
 
 ## Instalar
 
@@ -50,7 +51,8 @@ Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
 
 Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
 estiver no repo (é o `install.sh`), `just dry-run` só mostra e `just test`
-roda os testes: a lógica pura dos mods (`test/mods-test.mjs`), o `herdr-lane`
+roda os testes: a lógica pura do `pane-head` e do patch do `space-folders`, e
+que o `next-needed` carrega (`test/mods-test.mjs`), o `herdr-lane`
 com mutantes (`test/herdr-lane-test.sh`) e o `install.sh` numa config falsa
 (`test/install-smoke.sh`).
 
@@ -280,16 +282,18 @@ App GUI aberto de dentro de um pane deve ir com
 herdr-app do layout.switch --name main
 ```
 
-Isso volta para a sidebar original do Herdr. Para desfazer tudo, apague em
-`~/.config/herdr-app/mods/` as pastas `next-needed`, `session-status`,
-`ary-menu`, `pane-head`, `space-folders` e `html-viewer`, os links
-`~/.local/bin/herdr-lane`, `~/.local/bin/bora-lane` e
-`~/.omp/agent/rules/herdr-lane.md`, e depois copie de volta o que existia
-antes, guardado em `~/.config/herdr-app/backup-<data>/`.
+Isso volta para a sidebar original do Herdr. Para desfazer tudo, apague
+`~/.config/herdr-app/layouts/ary.json`, em `~/.config/herdr-app/mods/` as
+pastas `next-needed`, `session-status`, `ary-menu`, `pane-head`,
+`space-folders` e `html-viewer`, os links `~/.local/bin/herdr-lane`,
+`~/.local/bin/bora-lane` e `~/.omp/agent/rules/herdr-lane.md`, e depois copie
+de volta o que existia antes, guardado em `~/.config/herdr-app/backup-<data>/`
+(os links antigos ficam em `backup-<data>/global/`).
 
 ## Licença
 
 MIT (`LICENSE`). O `mods/space-folders/` é de Jankees van Woezik, também MIT,
-redistribuído com o `LICENSE` original dentro da pasta e um patch nosso (estado
+redistribuído com os arquivos de licença que vieram com ele (`LICENSE`, MIT, e
+`LICENSE-APACHE`) dentro da pasta e um patch nosso (estado
 do PR), marcado no código. `mods/pane-head/` e `mods/ary-menu/` partem dos mods
 `pane` e `menu` que vêm com o Herdr. O `html-viewer` não é redistribuído.

@@ -11,7 +11,7 @@ update:
 dry-run:
     bash install.sh --dry-run
 
-# Testa os mods (lógica pura), o herdr-lane + links globais (com mutantes) e o install.sh numa config falsa
+# Testa a lógica pura de pane-head e space-folders (next-needed só carrega), o herdr-lane + links globais (com mutantes) e o install.sh numa config falsa
 test:
     node test/mods-test.mjs
     bash test/herdr-lane-test.sh
