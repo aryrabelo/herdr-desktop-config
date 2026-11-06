@@ -1,8 +1,8 @@
 # herdr-desktop-config
 
-Como eu configuro o [Herdr](https://herdr.dev) desktop no Mac: atalhos, layouts,
-um mod próprio para pular para o agente que precisa de mim e a sidebar
-organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
+Como eu configuro o [Herdr](https://herdr.dev) desktop no Mac: atalhos, um
+layout, mods próprios (pular para o agente que precisa de mim, barra de baixo
+com o resumo da sessão, menu do terminal) e a sidebar organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 
 ## As peças
 
@@ -10,7 +10,7 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 |---|---|---|
 | atalhos | `config/keys.json` | atalhos globais, de terminal e a seção `layout:ary` (⌘⌥] / ⌘⌥[ e ⌥⇧⌘] / ⌥⇧⌘[) |
 | settings | `config/settings.json` | zoom 0.9, tema escuro, sons ligados |
-| layout `ary` | `config/layouts/ary.json` | o layout `main` com a sidebar em pastas (`space-folders`), a barra de baixo `session-status` e o menu de terminal `ary-menu` |
+| layout `ary` | `config/layouts/ary.json` | cópia do layout `main` do Herdr com a sidebar em pastas (`space-folders`), a barra de baixo `session-status` e o menu de terminal `ary-menu` |
 | mod `next-needed` | `mods/next-needed/` | ⌘J foca o próximo agente que precisa de você |
 | mod `session-status` | `mods/session-status/` | barra de baixo: o que o `workspace-status` mostra mais o resumo da sessão do agente em foco; passeio de agentes por prioridade (⌥⇧⌘] / ⌥⇧⌘[) |
 | mod `ary-menu` | `mods/ary-menu/` | menu do botão direito no terminal: o `menu` do Herdr 0.1.13 com **Copy pane info** |
@@ -19,6 +19,8 @@ organizada em pastas. Dá para reproduzir tudo na sua máquina com um comando.
 | mod `space-folders` | `mods/space-folders/` | sidebar em pastas, de [jankeesvw/herdr-space-folders](https://github.com/jankeesvw/herdr-space-folders) (MIT), commit `63a78b20d5ed30d57166a3c7165a6eb558c3ef84`, com o `LICENSE` do autor junto e um patch nosso: o estado do PR da branch na linha do space (veja abaixo) |
 | pastas automáticas | `bin/auto-pastas.sh` | cria uma pasta por projeto a partir de uma lista que você edita |
 | `herdr-lane` | `bin/herdr-lane` + `agent/rules/herdr-lane.md` | manda trabalho para o agente omp de outro repo, num space do Herdr (instalado com symlink em `~/.local/bin` e `~/.omp/agent/rules`) |
+| instalador | `install.sh` + `justfile` | instala tudo acima (veja "Instalar") |
+| testes | `test/` | `just test`: lógica dos mods, `herdr-lane` e um install numa config falsa |
 
 ### Estado do PR na linha do space
 
@@ -104,13 +106,16 @@ O `install.sh`:
    `space-folders` de `mods/` — **cópia, nunca symlink**: o Herdr não percebe
    mudança dentro de pasta de mod linkada;
 4. baixa o `html-viewer` (veja abaixo) e copia o mod dele;
-5. roda `herdr-app check` em cada mod.
+5. roda `herdr-app check` em cada mod;
+6. cria os links globais do `herdr-lane` (veja "Links globais").
 
 Outra pasta de config: `HERDR_APP_DIR=/caminho bash install.sh`.
 
 Com [`just`](https://github.com/casey/just): `just update` aplica tudo que
 estiver no repo (é o `install.sh`), `just dry-run` só mostra e `just test`
-roda o teste do `herdr-lane`.
+roda os testes: a lógica pura dos mods (`test/mods-test.mjs`), o `herdr-lane`
+com mutantes (`test/herdr-lane-test.sh`) e o `install.sh` numa config falsa
+(`test/install-smoke.sh`).
 
 Depois, ⌘⇧L e escolha `ary`.
 
@@ -182,9 +187,12 @@ tracejada, arraste pastas para reordenar.
 herdr-app do layout.switch --name main
 ```
 
-Isso volta para a sidebar original do Herdr. Para desfazer tudo, copie de
-volta os arquivos de `~/.config/herdr-app/backup-<data>/` e apague
-`~/.config/herdr-app/mods/next-needed` e `mods/space-folders`.
+Isso volta para a sidebar original do Herdr. Para desfazer tudo, apague em
+`~/.config/herdr-app/mods/` as pastas `next-needed`, `session-status`,
+`ary-menu`, `pane-head`, `space-folders` e `html-viewer`, os links
+`~/.local/bin/herdr-lane`, `~/.local/bin/bora-lane` e
+`~/.omp/agent/rules/herdr-lane.md`, e depois copie de volta o que existia
+antes, guardado em `~/.config/herdr-app/backup-<data>/`.
 
 ## Armadilha: app aberto de um pane morre quando o pane fecha
 
