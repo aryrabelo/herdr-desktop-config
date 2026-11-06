@@ -1,5 +1,6 @@
 // Carrega os mods com "herdr"/"gpui-*" falsos e testa a lógica pura:
-// pane-head (nome/endereço do agente) e o patch de PR do space-folders.
+// pane-head (nome/endereço do agente) e o patch de PR do space-folders; o
+// next-needed só precisa carregar.
 // `--live`: também consulta o GitHub (gh) nos PRs reais do pedido.
 //   node test/mods-test.mjs [--live]
 import { register } from "node:module";

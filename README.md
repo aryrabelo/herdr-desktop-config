@@ -270,8 +270,9 @@ real, e um mutante por ramo, morto pelo nome).
 ## Armadilha: app aberto de um pane morre quando o pane fecha
 
 O Herdr manda SIGHUP para todo processo com o `HC_TERMINAL_ID` do terminal que
-fecha, mesmo fora da árvore do pane, e o `open` repassa esse ambiente ao app. App GUI aberto de dentro de um
-pane deve ir com `env -i HOME="$HOME" /usr/bin/open …`.
+fecha, mesmo fora da árvore do pane, e o `open` repassa esse ambiente ao app.
+App GUI aberto de dentro de um pane deve ir com
+`env -i HOME="$HOME" /usr/bin/open …`.
 
 ## Voltar ao padrão
 
